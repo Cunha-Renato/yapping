@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 tokio = {version = "1.40.0", features = ["full"]}
 
-l3gion_rust = { path = "../../../l3gion_rust/l3gion_rust" }
+l3gion_rust = { git = "https://github.com/Cunha-Renato/l3gion_rust" }
 
 [profile.release]
 lto = true
