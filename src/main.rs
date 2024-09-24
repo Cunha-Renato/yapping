@@ -3,7 +3,6 @@ use l3gion_rust::{
     application::{
         ApplicationCreateInfo, 
         L3gion, 
-        PersistentApplicationInfo
     }, layer::Layer, renderer::CreationWindowInfo
 }, lg_types::reference::Rfc};
 
@@ -15,12 +14,12 @@ async fn main() {
     std::env::set_var("LOG", "4");
 
     let mut l3gion = L3gion::new(ApplicationCreateInfo {
-        persistant_info: PersistentApplicationInfo { v_sync: true },
         window_info: CreationWindowInfo {
             event_loop: None,
             title: "Yapping".to_string(),
             width: 1080,
             height: 720,
+            vsync: true,
         },
     }).unwrap();
     
