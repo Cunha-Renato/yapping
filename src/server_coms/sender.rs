@@ -1,15 +1,18 @@
-use std::{io::Write, net::TcpStream, sync::{Arc, Mutex}};
+use std::net::TcpStream;
+use std::sync::{Arc, Mutex};
+use websocket::{ClientBuilder, Message};
+use websocket::sync::Client;
 
-use l3gion_rust::{sllog::info, StdError};
+use l3gion_rust::StdError;
 
 #[derive(Default, Clone)]
 pub struct ServerSender {
     connected: bool,
     server_ip: String,
-    tcp_stream: Option<Arc<Mutex<TcpStream>>>,
+    client: Option<Arc<Mutex<Client<TcpStream>>>>,
 }
 impl ServerSender {
-    pub async fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
     
@@ -18,29 +21,24 @@ impl ServerSender {
     }
 
     pub fn try_connect(&mut self, ip: &str) -> Result<(), StdError> {
-        match TcpStream::connect(ip) {
-            Ok(tcp_stream) => {
-                self.tcp_stream = Some(Arc::new(Mutex::new(tcp_stream)));
-                self.connected = true;
-                self.server_ip = ip.to_string();
-                
-                info!("Connected: {} on: {}", self.connected, self.server_ip);
-                
-                Ok(())
-            }
-            Err(e) => {
-                Err(Box::new(e))
-            }
-        }
+        let client = ClientBuilder::new(ip)?.connect_insecure()?;
+        self.client = Some(Arc::new(Mutex::new(client)));
+        self.connected = true;
+        self.server_ip = ip.to_string();
         
+        return Ok(());
     }
 
     pub fn send(&mut self, message: &str) -> Result<(), StdError> {
-        if let Some(tcp_stream) = &self.tcp_stream {
-            return match tcp_stream.lock().unwrap().write_all(message.as_bytes()) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(Box::new(e)),
-            };
+        if let Some(client) = &mut self.client {
+            let message = Message::text(message);
+
+            client
+                .lock()
+                .unwrap()
+                .send_message(&message)?;
+            
+            return Ok(());
         }
         
         Err("Client is not connected to server! Cannot send message!".into())

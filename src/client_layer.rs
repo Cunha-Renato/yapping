@@ -16,7 +16,7 @@ pub struct ClientLayer {
     server_sender: ServerSender,
 }
 impl ClientLayer {
-    pub async fn new(app_core: ApplicationCore) -> Self {
+    pub fn new(app_core: ApplicationCore) -> Self {
         Self {
             app_core,
             server_sender: ServerSender::default(),
@@ -63,7 +63,7 @@ impl Layer for ClientLayer {
             if let Some(message) = show_message_window_gui(ui) {
                 let mut sender = self.server_sender.clone();
 
-                tokio::spawn(async move {
+                std::thread::spawn(move || {
                     if let Err(e) = sender.send(&message) {
                         error!("{:?}", e);
                     }

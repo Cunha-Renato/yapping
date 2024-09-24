@@ -9,8 +9,7 @@ use l3gion_rust::{
 mod client_layer;
 mod server_coms;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     std::env::set_var("LOG", "4");
 
     let mut l3gion = L3gion::new(ApplicationCreateInfo {
@@ -25,7 +24,7 @@ async fn main() {
     
     let l3gion_app = l3gion.get_app_mut();
     let client_layer = as_dyn!(
-        client_layer::ClientLayer::new(l3gion_app.core()).await,
+        client_layer::ClientLayer::new(l3gion_app.core()),
         dyn Layer
     );
     l3gion_app.push_layer(client_layer).unwrap();
