@@ -9,17 +9,23 @@ use l3gion_rust::{
     StdError
 };
 
+use crate::panels;
+use crate::panels::login::LoginGUI;
 use crate::server_coms::sender::ServerSender;
 
 pub struct ClientLayer {
     app_core: ApplicationCore,
     server_sender: ServerSender,
+    
+    login_gui: LoginGUI,
 }
 impl ClientLayer {
     pub fn new(app_core: ApplicationCore) -> Self {
         Self {
             app_core,
             server_sender: ServerSender::default(),
+            
+            login_gui: LoginGUI::default(),
         }
     }
 }
@@ -31,6 +37,7 @@ impl Layer for ClientLayer {
 
     fn on_attach(&mut self) -> Result<(), StdError> {
         info!("ClientLayer attached!");
+        panels::config::init_gui(&self.app_core.renderer.borrow());
         Ok(())
     }
 
@@ -52,7 +59,14 @@ impl Layer for ClientLayer {
     }
 
     fn on_imgui(&mut self, ui: &mut imgui::Ui) {
-        if !self.server_sender.connected() {
+        /* unsafe {
+            imgui::sys::igDockSpaceOverViewport(imgui::sys::igGetMainViewport(), 0, std::ptr::null());
+        } */
+
+        panels::config::config_dockspace_gui(ui);
+        self.login_gui.show_login_gui(ui);
+
+        /* if !self.server_sender.connected() {
             if let Some(server_ip) = show_server_config_window_gui(ui) {
                 if let Err(e) = self.server_sender.try_connect(&server_ip) {
                     error!("{:?}", e);
@@ -69,11 +83,11 @@ impl Layer for ClientLayer {
                     }
                 });
             }
-        }
+        } */
     }
 }
 
-fn show_message_window_gui(ui: &mut imgui::Ui) -> Option<String> {
+/* fn show_message_window_gui(ui: &mut imgui::Ui) -> Option<String> {
     let mut buffer = String::default();
     let mut result = None;
 
@@ -96,7 +110,7 @@ fn show_message_window_gui(ui: &mut imgui::Ui) -> Option<String> {
         });
     
     result
-}
+} */
 
 fn show_server_config_window_gui(ui: &mut imgui::Ui) -> Option<String> {
     let mut buffer = String::default();

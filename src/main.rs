@@ -8,6 +8,7 @@ use l3gion_rust::{
 
 mod client_layer;
 mod server_coms;
+mod panels;
 
 fn main() {
     std::env::set_var("LOG", "4");
