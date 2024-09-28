@@ -11,7 +11,9 @@ mod server_coms;
 mod panels;
 
 fn main() {
-    std::env::set_var("LOG", "4");
+    if cfg!(debug_assertions) {
+        std::env::set_var("LOG", "4");
+    }
 
     let mut l3gion = L3gion::new(ApplicationCreateInfo {
         window_info: CreationWindowInfo {

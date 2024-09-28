@@ -18,6 +18,8 @@ pub struct ClientLayer {
     server_sender: ServerSender,
     
     login_gui: LoginGUI,
+    
+    current_theme: panels::theme::Theme,
 }
 impl ClientLayer {
     pub fn new(app_core: ApplicationCore) -> Self {
@@ -26,6 +28,8 @@ impl ClientLayer {
             server_sender: ServerSender::default(),
             
             login_gui: LoginGUI::default(),
+            
+            current_theme: panels::theme::MAIN_THEME,
         }
     }
 }
@@ -37,7 +41,7 @@ impl Layer for ClientLayer {
 
     fn on_attach(&mut self) -> Result<(), StdError> {
         info!("ClientLayer attached!");
-        panels::config::init_gui(&self.app_core.renderer.borrow());
+        panels::init_gui(&mut self.app_core.renderer.borrow_mut());
         Ok(())
     }
 
@@ -63,8 +67,7 @@ impl Layer for ClientLayer {
             imgui::sys::igDockSpaceOverViewport(imgui::sys::igGetMainViewport(), 0, std::ptr::null());
         } */
 
-        panels::config::config_dockspace_gui(ui);
-        self.login_gui.show_login_gui(ui);
+        self.login_gui.show_login_gui(&self.current_theme, ui);
 
         /* if !self.server_sender.connected() {
             if let Some(server_ip) = show_server_config_window_gui(ui) {

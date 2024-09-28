@@ -6,9 +6,8 @@ edition = "2021"
 [dependencies]
 websocket = "0.24.0"
 
-l3gion_rust = { git = "https://github.com/Cunha-Renato/l3gion_rust" }
+l3gion_rust = {path = "../../l3gion_rust/l3gion_rust"}
 
 [profile.release]
 lto = true
-codgen-units = 1
 panic = "abort"
