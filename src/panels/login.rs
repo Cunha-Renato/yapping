@@ -1,4 +1,4 @@
-use l3gion_rust::{imgui, sllog::info};
+use l3gion_rust::{imgui, sllog::info, StdError};
 
 const BORDER_RADIUS: f32 = 3.0;
 
@@ -8,7 +8,11 @@ pub(crate) struct LoginGUI {
     password_buffer: String,
 }
 impl LoginGUI {
-    pub fn show_login_gui(&mut self, theme: &super::theme::Theme, ui: &mut imgui::Ui) {
+    pub(crate) fn show_login_gui(
+        &mut self, 
+        theme: &super::theme::Theme, 
+        ui: &mut imgui::Ui
+    ) {
         let mut done = false;
 
         let window_bg = ui.push_style_color(imgui::StyleColor::WindowBg, theme.main_bg_color);
@@ -21,7 +25,17 @@ impl LoginGUI {
                 | imgui::WindowFlags::NO_MOVE
             )
             .build(|| {
+                // Seting the cursor
+                // let region_avail = ui.content_region_avail();
+                // ui.set_cursor_pos([region_avail[0] / 2.0, 0.0]);
+
                 let mut fonts = Vec::new();
+
+                // Logo
+                if let Some(logo_texture_id) = super::get_logo_texture_id() {
+                    imgui::Image::new(logo_texture_id, [200.0, 200.0]).build(ui);
+                }
+
                 // User Tag
                 fonts.push(super::use_font(ui, super::FontType::BOLD24));
                 ui.text("User Tag:");

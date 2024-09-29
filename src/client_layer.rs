@@ -41,7 +41,7 @@ impl Layer for ClientLayer {
 
     fn on_attach(&mut self) -> Result<(), StdError> {
         info!("ClientLayer attached!");
-        panels::init_gui(&mut self.app_core.renderer.borrow_mut());
+        panels::init_gui(&mut self.app_core.renderer.borrow_mut())?;
         Ok(())
     }
 
