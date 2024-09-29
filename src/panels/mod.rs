@@ -1,5 +1,5 @@
 use std::cell::OnceCell;
-use l3gion_rust::{imgui, lg_core::renderer::{command::SendRendererCommand, texture::{Texture, TextureFilter, TextureFormat, TextureSpecs}, Renderer}, StdError};
+use l3gion_rust::{imgui, lg_core::renderer::{texture::{Texture, TextureFilter, TextureFormat, TextureSpecs}, Renderer}, StdError};
 
 #[derive(Debug, Clone, Copy)]
 enum FontType {
@@ -85,7 +85,8 @@ pub(crate) fn init_gui(renderer: &mut Renderer) -> Result<(), StdError> {
         ),
     ]);
 
-    renderer.send_and_wait(SendRendererCommand::SET_FONTS, std::time::Duration::from_millis(500));
+    renderer.set_fonts();
+    std::thread::sleep(std::time::Duration::from_millis(200));
 
     let fonts = Fonts {
         regular_17: imgui_core.get_font_id("Roboto-Regular17").unwrap(),
