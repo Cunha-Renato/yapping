@@ -154,6 +154,7 @@ fn text_input(
 fn button(
     ui: &imgui::Ui,
     label: &str,
+    size: [f32; 2],
     border_radius: f32,
     idle_color: [f32; 4],
     hover_color: [f32; 4],
@@ -165,7 +166,7 @@ fn button(
     let active_color = ui.push_style_color(imgui::StyleColor::ButtonActive, active_color);
     let border_radius = ui.push_style_var(imgui::StyleVar::FrameRounding(border_radius));
 
-    let clicked = ui.button(label);
+    let clicked = ui.button_with_size(label, size);
 
     idle_color.pop();
     hover_color.pop();
@@ -173,4 +174,10 @@ fn button(
     border_radius.pop();
 
     return clicked;
+}
+
+fn spacing(ui: &imgui::Ui, quantity: u32) {
+    for _ in 0..quantity {
+        ui.spacing();
+    }
 }
