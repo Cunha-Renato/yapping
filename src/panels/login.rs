@@ -1,4 +1,4 @@
-use l3gion_rust::{imgui, sllog::info, StdError};
+use l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::info, StdError};
 
 const BORDER_RADIUS: f32 = 3.0;
 
@@ -10,7 +10,8 @@ pub(crate) struct LoginGUI {
 impl LoginGUI {
     pub(crate) fn show_login_gui(
         &mut self, 
-        theme: &super::theme::Theme, 
+        renderer: &Renderer,
+        theme: &super::theme::Theme,
         ui: &mut imgui::Ui
     ) {
         let mut done = false;
@@ -28,7 +29,7 @@ impl LoginGUI {
                 let window_size = ui.window_size();
 
                 // Logo
-                if let Some(logo_texture_id) = super::get_logo_texture_id() {
+                if let Some(logo_texture_id) = super::get_logo_texture_id(renderer) {
                     ui.set_cursor_pos([window_size[0] / 2.0 - 150.0, window_size[1] / 3.0 - 150.0]);
                     imgui::Image::new(logo_texture_id, [300.0, 300.0]).build(ui);
                 }

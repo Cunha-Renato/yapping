@@ -63,13 +63,9 @@ impl Layer for ClientLayer {
     }
 
     fn on_imgui(&mut self, ui: &mut imgui::Ui) {
-        /* unsafe {
-            imgui::sys::igDockSpaceOverViewport(imgui::sys::igGetMainViewport(), 0, std::ptr::null());
-        } */
+        self.login_gui.show_login_gui(&self.app_core.renderer.borrow(), &self.current_theme, ui);
 
-        self.login_gui.show_login_gui(&self.current_theme, ui);
-
-        /* if !self.server_sender.connected() {
+        if !self.server_sender.connected() {
             if let Some(server_ip) = show_server_config_window_gui(ui) {
                 if let Err(e) = self.server_sender.try_connect(&server_ip) {
                     error!("{:?}", e);
@@ -86,11 +82,11 @@ impl Layer for ClientLayer {
                     }
                 });
             }
-        } */
+        }
     }
 }
 
-/* fn show_message_window_gui(ui: &mut imgui::Ui) -> Option<String> {
+fn show_message_window_gui(ui: &mut imgui::Ui) -> Option<String> {
     let mut buffer = String::default();
     let mut result = None;
 
@@ -113,7 +109,7 @@ impl Layer for ClientLayer {
         });
     
     result
-} */
+}
 
 fn show_server_config_window_gui(ui: &mut imgui::Ui) -> Option<String> {
     let mut buffer = String::default();

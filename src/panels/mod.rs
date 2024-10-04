@@ -1,5 +1,5 @@
 use std::cell::OnceCell;
-use l3gion_rust::{imgui, lg_core::renderer::{texture::{Texture, TextureFilter, TextureFormat, TextureSpecs}, Renderer}, StdError};
+use l3gion_rust::{imgui, lg_core::{renderer::{texture::{Texture, TextureFilter, TextureFormat, TextureSpecs}, Renderer}, uuid::UUID}, StdError};
 
 #[derive(Debug, Clone, Copy)]
 enum FontType {
@@ -17,9 +17,10 @@ struct Fonts {
     bold_24: imgui::FontId,
 }
 
+static LOGO_PATH: &str = "assets/logo.png";
+
 thread_local! {
     static FONTS: OnceCell<Fonts> = OnceCell::new();
-    static LOGO_TEXTURE_POINTER: OnceCell<*const Texture> = OnceCell::new();
 }
 
 pub mod theme;
@@ -35,15 +36,10 @@ pub(crate) fn init_gui(renderer: &mut Renderer) -> Result<(), StdError> {
             ..Default::default()
         };
         
-        LOGO_TEXTURE_POINTER.with(|logo| {
-            let logo_texture = am
-                .lock()
-                .unwrap()
-                .create_texture("logo_texture", "assets/logo.png", specs)
-                .unwrap();
-
-            logo.set(logo_texture).unwrap();
-        });
+        am.lock()
+            .unwrap()
+            .create_texture("logo_texture", LOGO_PATH, specs)
+            .unwrap();
     }
 
     // Saving the fonts
@@ -100,18 +96,20 @@ pub(crate) fn init_gui(renderer: &mut Renderer) -> Result<(), StdError> {
     Ok(())
 }
 
-fn get_logo_texture_id() -> Option<imgui::TextureId> {
-    LOGO_TEXTURE_POINTER.with(|logo| {
-        if let Some(pointer) = logo.get() {
-            unsafe {
-                if let Some(gl_id) = pointer.as_ref().unwrap().gl_id() {
-                    return Some(imgui::TextureId::new(gl_id as usize));
-                }
-            }
-        }
-        
-        None
-    })
+fn get_logo_texture_id(renderer: &Renderer) -> Option<imgui::TextureId> {
+    match renderer
+        .asset_manager()
+        .lock()
+        .unwrap()
+        .get_texture(&UUID::from_string(LOGO_PATH).unwrap())
+    {
+        Ok(texture_ptr) => match unsafe { texture_ptr.as_ref().unwrap().gl_id() } {
+            Some(gl_id) => Some(imgui::TextureId::new(gl_id as usize)),
+            None => None,
+        },
+
+        Err(_) => None,
+    }
 }
 
 fn use_font(ui: &imgui::Ui, font_type: FontType) -> imgui::FontStackToken {
