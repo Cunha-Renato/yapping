@@ -1,17 +1,16 @@
 use std::net::TcpStream;
-use std::sync::{Arc, Mutex};
 use websocket::{ClientBuilder, Message};
 use websocket::sync::Client;
 
 use l3gion_rust::StdError;
 
-#[derive(Default, Clone)]
-pub struct ServerSender {
+#[derive(Default)]
+pub struct ServerCommunication {
     connected: bool,
     server_ip: String,
-    client: Option<Arc<Mutex<Client<TcpStream>>>>,
+    client: Option<Client<TcpStream>>,
 }
-impl ServerSender {
+impl ServerCommunication {
     pub fn new() -> Self {
         Self::default()
     }
@@ -22,7 +21,7 @@ impl ServerSender {
 
     pub fn try_connect(&mut self, ip: &str) -> Result<(), StdError> {
         let client = ClientBuilder::new(ip)?.connect_insecure()?;
-        self.client = Some(Arc::new(Mutex::new(client)));
+        self.client = Some(client);
         self.connected = true;
         self.server_ip = ip.to_string();
         
@@ -33,10 +32,7 @@ impl ServerSender {
         if let Some(client) = &mut self.client {
             let message = Message::text(message);
 
-            client
-                .lock()
-                .unwrap()
-                .send_message(&message)?;
+            client.send_message(&message)?;
             
             return Ok(());
         }

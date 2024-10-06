@@ -1,5 +1,7 @@
 use std::cell::OnceCell;
-use l3gion_rust::{imgui, lg_core::{renderer::{texture::{Texture, TextureFilter, TextureFormat, TextureSpecs}, Renderer}, uuid::UUID}, StdError};
+use l3gion_rust::{imgui, lg_core::{renderer::{texture::{TextureFilter, TextureFormat, TextureSpecs}, Renderer}, uuid::UUID}, StdError};
+
+const BORDER_RADIUS: f32 = 3.0;
 
 #[derive(Debug, Clone, Copy)]
 enum FontType {
@@ -17,29 +19,25 @@ struct Fonts {
     bold_24: imgui::FontId,
 }
 
-static LOGO_PATH: &str = "assets/logo.png";
+static LOGO_PATH: &str = "assets/textures/logo.png";
 
 thread_local! {
     static FONTS: OnceCell<Fonts> = OnceCell::new();
 }
 
-pub mod theme;
-pub mod login;
+pub(crate) mod validation_gui;
+pub(crate) mod theme;
 
 pub(crate) fn init_gui(renderer: &mut Renderer) -> Result<(), StdError> {
     // Saving Logo Image
     {
-        let am = renderer.asset_manager();
         let specs = TextureSpecs {
             tex_format: TextureFormat::RGBA,
             tex_filter: TextureFilter::NEAREST,
             ..Default::default()
         };
         
-        am.lock()
-            .unwrap()
-            .create_texture("logo_texture", LOGO_PATH, specs)
-            .unwrap();
+        renderer.create_texture("logo_texture", LOGO_PATH, specs)?;
     }
 
     // Saving the fonts
@@ -97,11 +95,7 @@ pub(crate) fn init_gui(renderer: &mut Renderer) -> Result<(), StdError> {
 }
 
 fn get_logo_texture_id(renderer: &Renderer) -> Option<imgui::TextureId> {
-    match renderer
-        .asset_manager()
-        .lock()
-        .unwrap()
-        .get_texture(&UUID::from_string(LOGO_PATH).unwrap())
+    match renderer.get_texture(&UUID::from_string(LOGO_PATH).unwrap())
     {
         Ok(texture_ptr) => match unsafe { texture_ptr.as_ref().unwrap().gl_id() } {
             Some(gl_id) => Some(imgui::TextureId::new(gl_id as usize)),

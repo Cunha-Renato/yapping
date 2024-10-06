@@ -1,4 +1,5 @@
 use l3gion_rust::imgui;
+use l3gion_rust::lg_types::reference::Rfc;
 use l3gion_rust::sllog::{error, info};
 use l3gion_rust::{
     lg_core::{
@@ -9,27 +10,33 @@ use l3gion_rust::{
     StdError
 };
 
-use crate::panels;
-use crate::panels::login::LoginGUI;
-use crate::server_coms::sender::ServerSender;
+use crate::client_manager::{ClientManager, ForegroundState};
+use crate::gui;
+use crate::gui::theme::MAIN_THEME;
+use crate::gui::validation_gui::Validation;
+use crate::server_coms::ServerCommunication;
 
 pub struct ClientLayer {
     app_core: ApplicationCore,
-    server_sender: ServerSender,
+    server_coms: Rfc<ServerCommunication>,
     
-    login_gui: LoginGUI,
-    
-    current_theme: panels::theme::Theme,
+    validation_manager: Validation,
+    client_manager: ClientManager,
 }
 impl ClientLayer {
     pub fn new(app_core: ApplicationCore) -> Self {
+        let server_coms = Rfc::new(ServerCommunication::default());
+
         Self {
             app_core,
-            server_sender: ServerSender::default(),
+            server_coms: Rfc::clone(&server_coms),
             
-            login_gui: LoginGUI::default(),
-            
-            current_theme: panels::theme::MAIN_THEME,
+            validation_manager: Validation::default(),
+            client_manager: ClientManager::new(
+                server_coms,
+                MAIN_THEME,
+                ForegroundState::LOGIN_PAGE,
+            ),
         }
     }
 }
@@ -41,7 +48,7 @@ impl Layer for ClientLayer {
 
     fn on_attach(&mut self) -> Result<(), StdError> {
         info!("ClientLayer attached!");
-        panels::init_gui(&mut self.app_core.renderer.borrow_mut())?;
+        gui::init_gui(&mut self.app_core.renderer.borrow_mut())?;
         Ok(())
     }
 
@@ -63,9 +70,9 @@ impl Layer for ClientLayer {
     }
 
     fn on_imgui(&mut self, ui: &mut imgui::Ui) {
-        self.login_gui.show_login_gui(&self.app_core.renderer.borrow(), &self.current_theme, ui);
+        self.validation_manager.show_and_manage_validation_gui(&self.app_core.renderer.borrow(), &mut self.client_manager, ui);
 
-        if !self.server_sender.connected() {
+        /* if !self.server_sender.connected() {
             if let Some(server_ip) = show_server_config_window_gui(ui) {
                 if let Err(e) = self.server_sender.try_connect(&server_ip) {
                     error!("{:?}", e);
@@ -82,11 +89,11 @@ impl Layer for ClientLayer {
                     }
                 });
             }
-        }
+        } */
     }
 }
 
-fn show_message_window_gui(ui: &mut imgui::Ui) -> Option<String> {
+/* fn show_message_window_gui(ui: &mut imgui::Ui) -> Option<String> {
     let mut buffer = String::default();
     let mut result = None;
 
@@ -128,4 +135,4 @@ fn show_server_config_window_gui(ui: &mut imgui::Ui) -> Option<String> {
         });
     
     result
-}
+} */

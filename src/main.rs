@@ -8,7 +8,9 @@ use l3gion_rust::{
 
 mod client_layer;
 mod server_coms;
-mod panels;
+mod gui;
+mod client_manager;
+mod user_action;
 
 fn main() {
     if cfg!(debug_assertions) {
