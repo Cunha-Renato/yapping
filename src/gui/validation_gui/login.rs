@@ -1,4 +1,4 @@
-use l3gion_rust::{imgui, lg_core::renderer::Renderer};
+use yapping_core::l3gion_rust::{imgui, lg_core::renderer::Renderer};
 use crate::{user_action::UserAction, gui::*};
 
 pub(super) fn show_login_gui(

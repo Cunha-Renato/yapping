@@ -1,5 +1,6 @@
 use std::cell::OnceCell;
-use l3gion_rust::{imgui, lg_core::{renderer::{texture::{TextureFilter, TextureFormat, TextureSpecs}, Renderer}, uuid::UUID}, StdError};
+
+use yapping_core::l3gion_rust::{imgui, lg_core::renderer::{texture::{TextureFilter, TextureFormat, TextureSpecs}, Renderer}, StdError, UUID};
 
 const BORDER_RADIUS: f32 = 3.0;
 

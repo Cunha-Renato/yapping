@@ -1,10 +1,5 @@
-use l3gion_rust::{
-    as_dyn, lg_core::{
-    application::{
-        ApplicationCreateInfo, 
-        L3gion, 
-    }, layer::Layer, renderer::CreationWindowInfo
-}, lg_types::reference::Rfc};
+use yapping_core::l3gion_rust::{as_dyn, lg_core::{application::{ApplicationCreateInfo, L3gion}, layer::Layer, renderer::CreationWindowInfo}, Rfc};
+
 
 mod client_layer;
 mod server_coms;

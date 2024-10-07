@@ -1,4 +1,4 @@
-use l3gion_rust::{imgui, lg_core::{renderer::Renderer, uuid::UUID}};
+use yapping_core::l3gion_rust::{imgui, lg_core::{renderer::Renderer, uuid::UUID}};
 use crate::{user_action::UserAction, gui::*};
 
 pub(super) fn show_sign_up_gui(

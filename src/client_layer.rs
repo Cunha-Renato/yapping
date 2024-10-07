@@ -1,14 +1,8 @@
-use l3gion_rust::imgui;
-use l3gion_rust::lg_types::reference::Rfc;
-use l3gion_rust::sllog::{error, info};
-use l3gion_rust::{
-    lg_core::{
-        application::ApplicationCore,
-        event::LgEvent,
-        layer::Layer, 
-    },
-    StdError
-};
+use yapping_core::l3gion_rust::lg_core::application::ApplicationCore;
+use yapping_core::l3gion_rust::lg_core::event::LgEvent;
+use yapping_core::l3gion_rust::lg_core::layer::Layer;
+use yapping_core::l3gion_rust::sllog::info;
+use yapping_core::l3gion_rust::{imgui, Rfc, StdError};
 
 use crate::client_manager::{ClientManager, ForegroundState};
 use crate::gui;

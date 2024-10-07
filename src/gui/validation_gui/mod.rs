@@ -1,4 +1,4 @@
-use l3gion_rust::{imgui, lg_core::{renderer::Renderer, uuid::UUID}};
+use yapping_core::l3gion_rust::{imgui, lg_core::{renderer::Renderer, uuid::UUID}};
 use crate::client_manager::{ClientManager, ForegroundState};
 
 mod login;

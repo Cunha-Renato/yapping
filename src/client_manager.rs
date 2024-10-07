@@ -1,4 +1,4 @@
-use l3gion_rust::{lg_types::reference::Rfc, StdError};
+use yapping_core::l3gion_rust::{Rfc, StdError};
 
 use crate::{user_action::UserAction, gui::theme::Theme, server_coms::ServerCommunication};
 

@@ -1,8 +1,7 @@
 use std::net::TcpStream;
 use websocket::{ClientBuilder, Message};
 use websocket::sync::Client;
-
-use l3gion_rust::StdError;
+use yapping_core::l3gion_rust::StdError;
 
 #[derive(Default)]
 pub struct ServerCommunication {
