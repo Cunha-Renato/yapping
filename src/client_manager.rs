@@ -1,6 +1,6 @@
 use yapping_core::l3gion_rust::{Rfc, StdError};
 
-use crate::{user_action::UserAction, gui::theme::Theme, server_coms::ServerCommunication};
+use crate::{ClientMessage, gui::theme::Theme, server_coms::ServerCommunication};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Eq)]
@@ -31,9 +31,9 @@ impl ClientManager {
             foreground_state,
         }
     }
-    pub(crate) fn user_action(&mut self, user_action: UserAction) -> Result<(), StdError> {
+    pub(crate) fn user_action(&mut self, user_action: ClientMessage) -> Result<(), StdError> {
         match user_action {
-            UserAction::LOGIN => match self.foreground_state {
+            ClientMessage::LOGIN(_) => match self.foreground_state {
                 ForegroundState::LOGIN_PAGE => {
                     // TODO: Request LOGIN
                     // Simulating the server
@@ -49,7 +49,7 @@ impl ClientManager {
                 }
                 _ => Ok(()),
             },
-            UserAction::SIGN_UP => match self.foreground_state {
+            ClientMessage::SIGN_UP(_) => match self.foreground_state {
                 ForegroundState::LOGIN_PAGE => {
                     self.foreground_state = ForegroundState::SIGN_UP_PAGE;
 
@@ -58,13 +58,16 @@ impl ClientManager {
                 ForegroundState::SIGN_UP_PAGE => {
                     // TODO: Request Sign Up
                     // Simulating the server
-                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    if self.server_coms.borrow().connected() {
+                        self.server_coms.borrow_mut().send(user_action)?;
+                    }
                     // TODO: self.foreground_state = ForegroundState::MAIN_PAGE
 
                     Err("Failed to Sign Up".into())
                 },
                 _ => Ok(()),
             },
+            _ => Ok(()),
         }
     }
 }

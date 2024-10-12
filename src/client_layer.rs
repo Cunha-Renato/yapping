@@ -20,6 +20,7 @@ pub struct ClientLayer {
 impl ClientLayer {
     pub fn new(app_core: ApplicationCore) -> Self {
         let server_coms = Rfc::new(ServerCommunication::default());
+        server_coms.borrow_mut().try_connect("ws://127.0.0.1:8080").unwrap();
 
         Self {
             app_core,

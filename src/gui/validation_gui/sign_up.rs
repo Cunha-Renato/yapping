@@ -1,19 +1,19 @@
-use yapping_core::l3gion_rust::{imgui, lg_core::{renderer::Renderer, uuid::UUID}};
-use crate::{user_action::UserAction, gui::*};
+use yapping_core::{l3gion_rust::{imgui, lg_core::{renderer::Renderer, uuid::UUID}}, user::UserCreationInfo};
+use crate::{ClientMessage, gui::*};
 
 pub(super) fn show_sign_up_gui(
     renderer: &Renderer,
     theme: &theme::Theme,
     mut user_tag_buffer: String,
     mut user_email_buffer: String,
+    mut password_buffer: String,
     error_message: &str,
     ui: &mut imgui::Ui
-) -> (String, String, UUID, Option<UserAction>)
+) -> (String, String, String, Option<ClientMessage>)
 {
-    let mut result = None;
+    let mut result: Option<ClientMessage> = None;
 
-    let mut password = UUID::from_u128(0);
-    let mut password_buffer= String::default();
+    let mut password = UUID::default();
     let _window_bg = ui.push_style_color(imgui::StyleColor::WindowBg, theme.main_bg_color);
 
     ui.window("Sign Up Window")
@@ -66,7 +66,7 @@ pub(super) fn show_sign_up_gui(
             text_input(
                 ui, 
                 &mut user_tag_buffer,
-                "##user_tag", 
+                "##user_tag_sign_up", 
                 theme.input_text_bg_light, 
                 [0.0, 0.0, 0.0, 1.0],
                 BORDER_RADIUS,
@@ -85,7 +85,7 @@ pub(super) fn show_sign_up_gui(
             text_input(
                 ui, 
                 &mut user_email_buffer,
-                "##user_email", 
+                "##user_email_sign_up", 
                 theme.input_text_bg_light, 
                 [0.0, 0.0, 0.0, 1.0],
                 BORDER_RADIUS,
@@ -103,7 +103,7 @@ pub(super) fn show_sign_up_gui(
             text_input(
                 ui, 
                 &mut password_buffer, 
-                "##password", 
+                "##password_sign_up", 
                 theme.input_text_bg_light, 
                 [0.0, 0.0, 0.0, 1.0],
                 BORDER_RADIUS,
@@ -128,7 +128,11 @@ pub(super) fn show_sign_up_gui(
                 theme.sign_up_btn_color, 
                 theme.sign_up_actv_btn_color, 
             ) {
-                result = Some(UserAction::SIGN_UP);
+                result = Some(ClientMessage::SIGN_UP(UserCreationInfo {
+                    tag: user_tag_buffer.clone(),
+                    email: user_email_buffer.clone(),
+                    password,
+                }));
             }
 
             ui.same_line_with_pos(ui.content_region_avail()[0] - 92.0); // No fucking idea why is 92 and not 100.
@@ -141,7 +145,11 @@ pub(super) fn show_sign_up_gui(
                 theme.positive_btn_color, 
                 theme.positive_actv_btn_color,
             ) {
-                result = Some(UserAction::LOGIN);
+                result = Some(ClientMessage::LOGIN(UserCreationInfo {
+                    tag: String::default(),
+                    email: String::default(),
+                    password: UUID::generate(),
+                }));
             }
             
             // Show error message
@@ -155,5 +163,5 @@ pub(super) fn show_sign_up_gui(
             table.end();
         });
     
-    (user_tag_buffer, user_email_buffer, password, result)
+    (user_tag_buffer, user_email_buffer, password_buffer, result)
 }
