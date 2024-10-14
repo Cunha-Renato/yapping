@@ -1,53 +1,42 @@
-use yapping_core::l3gion_rust::{imgui, lg_core::renderer::Renderer};
+use yapping_core::{l3gion_rust::{imgui, lg_core::renderer::Renderer}, user::UserCreationInfo};
 use crate::client_manager::{ClientManager, ForegroundState};
 
+mod gui_components;
 mod login;
 mod sign_up;
 
 #[derive(Default)]
 pub(crate) struct Validation {
     error: String,
-    user_tag: String,
-    user_e_mail: String,
-    password: String,
+    creation_info: (String, UserCreationInfo),
 }
 impl Validation {
     pub(crate) fn show_and_manage_validation_gui(&mut self, renderer: &Renderer, client_manager: &mut ClientManager, ui: &mut imgui::Ui) {
-        let mut client_action = None;
-
-        match client_manager.foreground_state {
+        let client_action = match client_manager.foreground_state {
             ForegroundState::LOGIN_PAGE => {
-                let (user_email, password, action) = login::show_login_gui(
+                let action = login::show_login_gui(
                     renderer, 
                     &client_manager.theme, 
-                    std::mem::take(&mut self.user_e_mail),
-                    std::mem::take(&mut self.password),
+                    &mut self.creation_info,
                     &self.error,
                     ui
                 );
-                client_action = action;
 
-                self.user_e_mail = user_email;
-                self.password = password;
+                action
             },
             ForegroundState::SIGN_UP_PAGE => {
-                let (user_tag, user_email, password, action) = sign_up::show_sign_up_gui(
+                let action = sign_up::show_sign_up_gui(
                     renderer, 
                     &client_manager.theme, 
-                    std::mem::take(&mut self.user_tag),
-                    std::mem::take(&mut self.user_e_mail),
-                    std::mem::take(&mut self.password),
+                    &mut self.creation_info,
                     &self.error,
                     ui
                 );
-                client_action = action;
 
-                self.user_tag = user_tag;
-                self.user_e_mail = user_email;
-                self.password = password;
+                action
             },
-            _ => (),
-        }
+            _ => None,
+        };
         
         if let Some(action) = client_action {
             match client_manager.user_action(action) {
@@ -55,9 +44,7 @@ impl Validation {
                 Err(e) => self.error = e.to_string(),
             }
 
-            self.password.clear();
-            self.user_tag.clear();
-            self.user_e_mail.clear();
+            self.creation_info = (String::default(), UserCreationInfo::default());
         }
     }
 }
