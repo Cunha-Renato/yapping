@@ -1,5 +1,4 @@
 use std::cell::OnceCell;
-
 use yapping_core::l3gion_rust::{imgui, lg_core::renderer::{texture::{TextureFilter, TextureFormat, TextureSpecs}, Renderer}, StdError, UUID};
 
 const BORDER_RADIUS: f32 = 3.0;
@@ -26,8 +25,8 @@ thread_local! {
     static FONTS: OnceCell<Fonts> = OnceCell::new();
 }
 
-pub(crate) mod validation_gui;
 pub(crate) mod theme;
+pub(crate) mod validation_gui;
 
 pub(crate) fn init_gui(renderer: &mut Renderer) -> Result<(), StdError> {
     // Saving Logo Image

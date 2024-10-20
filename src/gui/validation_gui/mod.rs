@@ -1,50 +1,61 @@
-use yapping_core::{l3gion_rust::{imgui, lg_core::renderer::Renderer}, user::UserCreationInfo};
-use crate::client_manager::{ClientManager, ForegroundState};
+use yapping_core::l3gion_rust::{imgui, lg_core::renderer::Renderer};
+use crate::gui::{get_logo_texture_id, spacing, text_input, theme::Theme, use_font, BORDER_RADIUS};
 
-mod gui_components;
-mod login;
-mod sign_up;
+pub(crate) mod validation_gui_manager;
 
-#[derive(Default)]
-pub(crate) struct Validation {
-    error: String,
-    creation_info: (String, UserCreationInfo),
+fn window<F, R>(
+    ui: &mut imgui::Ui,
+    theme: &Theme,
+    title: &str,
+    func: F,
+) -> Option<R>
+where
+    F: FnOnce(&imgui::Ui) -> R
+{
+    let _window_bg = ui.push_style_color(imgui::StyleColor::WindowBg, theme.main_bg_color);
+    ui.window(title)
+        .position([0.0, 0.0], imgui::Condition::Always)
+        .size(ui.io().display_size, imgui::Condition::Always)
+        .flags(imgui::WindowFlags::NO_TITLE_BAR
+            | imgui::WindowFlags::NO_RESIZE
+            | imgui::WindowFlags::NO_MOVE
+        )
+        .build(|| func(&ui))
 }
-impl Validation {
-    pub(crate) fn show_and_manage_validation_gui(&mut self, renderer: &Renderer, client_manager: &mut ClientManager, ui: &mut imgui::Ui) {
-        let client_action = match client_manager.foreground_state {
-            ForegroundState::LOGIN_PAGE => {
-                let action = login::show_login_gui(
-                    renderer, 
-                    &client_manager.theme, 
-                    &mut self.creation_info,
-                    &self.error,
-                    ui
-                );
 
-                action
-            },
-            ForegroundState::SIGN_UP_PAGE => {
-                let action = sign_up::show_sign_up_gui(
-                    renderer, 
-                    &client_manager.theme, 
-                    &mut self.creation_info,
-                    &self.error,
-                    ui
-                );
+fn display_logo(renderer: &Renderer, ui: &imgui::Ui) {
+    let window_size = ui.window_size();
 
-                action
-            },
-            _ => None,
-        };
-        
-        if let Some(action) = client_action {
-            match client_manager.user_action(action) {
-                Ok(_) => self.error.clear(),
-                Err(e) => self.error = e.to_string(),
-            }
-
-            self.creation_info = (String::default(), UserCreationInfo::default());
-        }
+    if let Some(logo_texture_id) = get_logo_texture_id(renderer) {
+        ui.set_cursor_pos([window_size[0] / 2.0 - 150.0, window_size[1] / 4.0 - 150.0]);
+        imgui::Image::new(logo_texture_id, [300.0, 300.0]).build(ui);
     }
+}
+
+fn text_input_with_title(
+    ui: &imgui::Ui,
+    theme: &Theme,
+    title: &str, 
+    label: &str,
+    buffer: &mut String,
+    flags: imgui::InputTextFlags
+) {
+    let mut _font = use_font(ui, crate::gui::FontType::BOLD24);
+    ui.text(title);
+    spacing(ui, 2);
+    
+    _font = use_font(ui, crate::gui::FontType::REGULAR24);
+    ui.set_next_item_width(ui.content_region_avail()[0]);
+    let _padding = ui.push_style_var(imgui::StyleVar::FramePadding([5.0, 5.0]));
+    text_input(
+        ui, 
+        buffer, 
+        label, 
+        theme.input_text_bg_light, 
+        [0.0, 0.0, 0.0, 1.0], 
+        BORDER_RADIUS, 
+        imgui::InputTextFlags::CALLBACK_RESIZE
+        | flags
+    );
+    spacing(ui, 5);
 }
