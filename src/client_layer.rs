@@ -40,6 +40,8 @@ impl Layer for ClientLayer {
     fn on_attach(&mut self) -> Result<(), StdError> {
         info!("ClientLayer attached!");
         gui::init_gui(&mut self.app_core.renderer.borrow_mut())?;
+        self.client_manager.init()?;
+
         Ok(())
     }
 
@@ -49,14 +51,10 @@ impl Layer for ClientLayer {
     }
 
     fn on_update(&mut self) -> Result<(), StdError> {
-        self.client_manager.on_update()
+        Ok(())
     }
 
     fn on_event(&mut self, event: &LgEvent) -> bool {
-        match event {
-            _ => ()
-        }
-
         false
     }
 

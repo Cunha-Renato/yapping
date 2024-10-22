@@ -16,7 +16,7 @@ fn main() {
             event_loop: None,
             title: "Yapping".to_string(),
             width: 1080,
-            height: 720,
+            height: 740,
             vsync: true,
         },
     }).unwrap();

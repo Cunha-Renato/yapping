@@ -2,7 +2,6 @@ use std::net::TcpStream;
 use websocket::{ClientBuilder, Message};
 use websocket::sync::Client;
 use yapping_core::l3gion_rust::StdError;
-use yapping_core::serde::Serialize;
 use yapping_core::server_message::ClientMessage;
 
 #[derive(Default)]
@@ -29,8 +28,7 @@ impl ServerCommunication {
         if let Some(client) = &mut self.client {
             let message = Message::binary(yapping_core::bincode::serialize(&message)?);
 
-            client.send_message(&message)?;
-            
+            client.send_message(&message)?;            
             return Ok(());
         }
         

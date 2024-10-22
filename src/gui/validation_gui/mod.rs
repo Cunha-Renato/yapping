@@ -18,6 +18,8 @@ where
         .size(ui.io().display_size, imgui::Condition::Always)
         .flags(imgui::WindowFlags::NO_TITLE_BAR
             | imgui::WindowFlags::NO_RESIZE
+            | imgui::WindowFlags::NO_SCROLLBAR
+            | imgui::WindowFlags::NO_SCROLL_WITH_MOUSE
             | imgui::WindowFlags::NO_MOVE
         )
         .build(|| func(&ui))

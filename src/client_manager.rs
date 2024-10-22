@@ -2,11 +2,9 @@ use yapping_core::l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::info,
 use crate::{gui::{theme::Theme, validation_gui::validation_gui_manager::ValidationGuiManager}, server_coms::ServerCommunication, ClientMessage};
 
 #[allow(non_camel_case_types)]
-#[derive(Debug)]
 pub(crate) enum ForegroundState {
     MAIN_PAGE,
-    LOGIN_PAGE(ValidationGuiManager),
-    SIGN_UP_PAGE(ValidationGuiManager),
+    VALIDATION(ValidationGuiManager),
     CHAT_PAGE,
     FRIENDS_PAGE,
 }
@@ -29,31 +27,36 @@ impl ClientManager {
         Self {
             server_coms,
             theme, 
-            foreground_state: ForegroundState::LOGIN_PAGE(ValidationGuiManager::default()),
+            foreground_state: ForegroundState::VALIDATION(ValidationGuiManager::new()),
         }
-    }
+    } 
 
-    pub(crate) fn on_update(&mut self) -> Result<(), StdError> {
+    pub(crate) fn init(&mut self) -> Result<(), StdError> {
         match &mut self.foreground_state {
-            ForegroundState::MAIN_PAGE => todo!(),
-            ForegroundState::LOGIN_PAGE(login) => if login.is_done() {
-                info!("{:?}", login.get_creation_info())
-            },
-            ForegroundState::SIGN_UP_PAGE(sign_up) => if sign_up.is_done() {
-                info!("{:?}", sign_up.get_creation_info())
-            },
-            ForegroundState::CHAT_PAGE => todo!(),
-            ForegroundState::FRIENDS_PAGE => todo!(),
-        }
+            ForegroundState::VALIDATION(validation) => {
+                let server_coms_login = Rfc::clone(&self.server_coms);
+                let server_coms_sign_up = Rfc::clone(&self.server_coms);
 
-        return Ok(())
+                validation
+                    .set_login_fn(move |info| {
+                        info!("Login: {:?}", info);
+                        server_coms_login.borrow_mut().send(ClientMessage::LOGIN(info))
+                    })
+                    .set_sign_up_fn(move |info| {
+                        info!("Sign Up: {:?}", info);
+                        server_coms_sign_up.borrow_mut().send(ClientMessage::SIGN_UP(info))
+                    });
+            }
+            _ => (),
+        };
+
+        Ok(())
     }
-    
+
     pub(crate) fn on_imgui(&mut self, ui: &mut imgui::Ui, renderer: &Renderer) {
         match &mut self.foreground_state {
             ForegroundState::MAIN_PAGE => todo!(),
-            ForegroundState::LOGIN_PAGE(login) => login.on_imgui(ui, renderer, &self.theme),
-            ForegroundState::SIGN_UP_PAGE(sign_up) => sign_up.on_imgui(ui, renderer, &self.theme),
+            ForegroundState::VALIDATION(validation) => validation.on_imgui(ui, renderer, &self.theme),
             ForegroundState::CHAT_PAGE => todo!(),
             ForegroundState::FRIENDS_PAGE => todo!(),
         } 
