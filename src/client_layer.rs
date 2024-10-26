@@ -1,7 +1,7 @@
 use yapping_core::l3gion_rust::lg_core::application::ApplicationCore;
 use yapping_core::l3gion_rust::lg_core::event::LgEvent;
 use yapping_core::l3gion_rust::lg_core::layer::Layer;
-use yapping_core::l3gion_rust::sllog::info;
+use yapping_core::l3gion_rust::sllog::{error, info};
 use yapping_core::l3gion_rust::{imgui, Rfc, StdError};
 
 use crate::client_manager::ClientManager;
@@ -18,7 +18,7 @@ pub struct ClientLayer {
 impl ClientLayer {
     pub fn new(app_core: ApplicationCore) -> Self {
         let server_coms = Rfc::new(ServerCommunication::default());
-        // server_coms.borrow_mut().try_connect("ws://127.0.0.1:8080").unwrap();
+        let _ = server_coms.borrow_mut().try_connect("ws://127.0.0.1:8080");
 
         Self {
             app_core,
@@ -51,6 +51,8 @@ impl Layer for ClientLayer {
     }
 
     fn on_update(&mut self) -> Result<(), StdError> {
+        let _ = self.server_coms.borrow_mut().on_update();
+        
         Ok(())
     }
 
