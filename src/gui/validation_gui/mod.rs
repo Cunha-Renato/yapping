@@ -3,7 +3,7 @@ use crate::gui::{get_logo_texture_id, spacing, text_input, theme::Theme, use_fon
 
 pub(crate) mod validation_gui_manager;
 
-fn window<F, R>(
+fn full_screen_window<F, R>(
     ui: &mut imgui::Ui,
     theme: &Theme,
     title: &str,
@@ -13,9 +13,22 @@ where
     F: FnOnce(&imgui::Ui) -> R
 {
     let _window_bg = ui.push_style_color(imgui::StyleColor::WindowBg, theme.main_bg_color);
+
+    let mut current_size = ui.io().display_size;
+    let min_size = [410.0, 610.0];
+
+    if current_size[0] < min_size[0] || current_size[1] < min_size[1] {
+        let new_size = [
+            current_size[0].max(min_size[0]),
+            current_size[1].max(min_size[1]),
+        ];
+
+        current_size = new_size;
+    };
+
     ui.window(title)
         .position([0.0, 0.0], imgui::Condition::Always)
-        .size(ui.io().display_size, imgui::Condition::Always)
+        .size(current_size, imgui::Condition::Always)
         .flags(imgui::WindowFlags::NO_TITLE_BAR
             | imgui::WindowFlags::NO_RESIZE
             | imgui::WindowFlags::NO_SCROLLBAR
@@ -28,10 +41,12 @@ where
 fn display_logo(renderer: &Renderer, ui: &imgui::Ui) {
     let window_size = ui.window_size();
 
-    if let Some(logo_texture_id) = get_logo_texture_id(renderer) {
-        ui.set_cursor_pos([window_size[0] / 2.0 - 150.0, window_size[1] / 4.0 - 150.0]);
-        imgui::Image::new(logo_texture_id, [300.0, 300.0]).build(ui);
-    }
+    super::show_logo(
+        ui, 
+        renderer, 
+        [300.0; 2], 
+        [window_size[0] / 2.0 - 150.0, window_size[1] / 4.0 - 150.0]
+    );
 }
 
 fn text_input_with_title(

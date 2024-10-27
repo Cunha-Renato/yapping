@@ -106,6 +106,18 @@ fn get_logo_texture_id(renderer: &Renderer) -> Option<imgui::TextureId> {
     }
 }
 
+fn show_logo(
+    ui: &imgui::Ui,
+    renderer: &Renderer,
+    size: [f32; 2],
+    pos: [f32; 2]
+) {
+    if let Some(logo_texture_id) = get_logo_texture_id(renderer) {
+        ui.set_cursor_pos(pos);
+        imgui::Image::new(logo_texture_id, size).build(ui);
+    }
+}
+
 fn use_font(ui: &imgui::Ui, font_type: FontType) -> imgui::FontStackToken {
     FONTS.with(|font| {
         let font = font.get().unwrap();
@@ -172,4 +184,43 @@ fn spacing(ui: &imgui::Ui, quantity: u32) {
     for _ in 0..quantity {
         ui.spacing();
     }
+}
+
+pub(super) fn show_loading_gui(
+    ui: &imgui::Ui, 
+    renderer: &Renderer,
+    position: [f32; 2], 
+    size: [f32; 2],
+    bg_color: [f32; 4],
+) {
+    let _window_bg = ui.push_style_color(imgui::StyleColor::WindowBg, bg_color);
+    ui.window("Loading Window")
+        .position(position, imgui::Condition::Always)
+        .size(size, imgui::Condition::Always)
+        .flags(imgui::WindowFlags::NO_TITLE_BAR
+            | imgui::WindowFlags::NO_RESIZE
+            | imgui::WindowFlags::NO_SCROLLBAR
+            | imgui::WindowFlags::NO_SCROLL_WITH_MOUSE
+            | imgui::WindowFlags::NO_MOVE
+        ) 
+        .build(|| {
+            let content_size = ui.content_region_avail();
+            let logo_size = content_size[0] / 3.0;
+            
+            show_logo(
+                ui, 
+                renderer, 
+                [logo_size; 2],
+                [
+                    content_size[0] / 3.0, 
+                    content_size[1] / 4.0 - logo_size / 2.0
+                ],
+            );
+            
+            let _font = use_font(ui, FontType::BOLD24);
+            let text = "LOAGING...";
+            let text_width = ui.calc_text_size(text)[0];
+            ui.set_cursor_pos([ui.content_region_avail()[0] / 2.0 - text_width / 2.0, size[1] / 1.5]);
+            ui.text(text);
+        });
 }

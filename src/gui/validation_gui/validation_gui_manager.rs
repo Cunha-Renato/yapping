@@ -1,46 +1,32 @@
+use std::rc::Rc;
+
 use yapping_core::{l3gion_rust::{imgui, lg_core::renderer::Renderer}, user::UserCreationInfo};
 use crate::gui::*;
 
 #[allow(non_camel_case_types)]
 #[derive(Default, Debug, Clone, Copy)]
-enum ValidationType {
+pub(crate) enum ValidationAction {
     #[default]
     LOGIN,
     SIGN_UP,
 }
 
 pub(crate) struct ValidationGuiManager {
+    theme: Rc<theme::Theme>,
     password_buffer: String,
     user_creation_info: UserCreationInfo,
     error_message: String,
-    validation_type: ValidationType,
-    login_fn: Box<dyn Fn(UserCreationInfo) -> Result<(), StdError>>,
-    sign_up_fn: Box<dyn Fn(UserCreationInfo) -> Result<(), StdError>>,
+    validation_type: ValidationAction,
 }
 impl ValidationGuiManager {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(theme: Rc<theme::Theme>) -> Self {
         Self {
+            theme,
             password_buffer: String::default(),
             user_creation_info: UserCreationInfo::default(),
             error_message: String::default(),
-            validation_type: ValidationType::default(),
-            login_fn: Box::new(|_| Ok(())),
-            sign_up_fn: Box::new(|_| Ok(())),
+            validation_type: ValidationAction::default(),
         }
-    }
-
-    pub(crate) fn set_login_fn<F>(&mut self, func: F) -> &mut Self
-    where F: Fn(UserCreationInfo) -> Result<(), StdError> + 'static
-    {
-        self.login_fn = Box::new(func);
-        self
-    }
-
-    pub(crate) fn set_sign_up_fn<F>(&mut self, func: F) -> &mut Self
-    where F: Fn(UserCreationInfo) -> Result<(), StdError> + 'static
-    {
-        self.sign_up_fn = Box::new(func);
-        self
     }
 
     pub(crate) fn set_error_message(&mut self, message: &str) {
@@ -51,12 +37,18 @@ impl ValidationGuiManager {
         &mut self,
         ui: &mut imgui::Ui,
         renderer: &Renderer,
-        theme: &theme::Theme,
+        mut func: impl FnMut(ValidationAction, UserCreationInfo) -> Result<(), StdError>
     ) {
-        match self.validation_type {
-            ValidationType::LOGIN => self.show_login(ui, renderer, theme),
-            ValidationType::SIGN_UP => self.show_sign_up(ui, renderer, theme),
-        };
+        if match self.validation_type {
+            ValidationAction::LOGIN => self.show_login(ui, renderer),
+            ValidationAction::SIGN_UP => self.show_sign_up(ui, renderer),
+        } {
+            self.error_message.clear();
+            
+            if let Err(e) = func(self.validation_type.clone(), std::mem::take(&mut self.user_creation_info)) {
+                self.error_message = e.to_string();
+            }
+        }
     }
 }
 impl ValidationGuiManager {
@@ -64,11 +56,11 @@ impl ValidationGuiManager {
         &mut self,
         ui: &mut imgui::Ui,
         renderer: &Renderer,
-        theme: &theme::Theme,
-    ) {
-        super::window(
+    ) -> bool
+    {
+        super::full_screen_window(
             ui,
-            theme,
+            &self.theme,
             "LoginWindow",
             |ui| {
                 let window_size = ui.window_size();
@@ -80,7 +72,7 @@ impl ValidationGuiManager {
                 {
                     table
                 }
-                else { return; };
+                else { return false; };
                 
                 ui.table_setup_column_with(imgui::TableColumnSetup::<&str> { 
                     flags: imgui::TableColumnFlags::WIDTH_FIXED, 
@@ -98,7 +90,7 @@ impl ValidationGuiManager {
                 
                 super::text_input_with_title(
                     ui, 
-                    theme, 
+                    &self.theme, 
                     "Email:", 
                     "##user_email_login", 
                     &mut self.user_creation_info.email,
@@ -107,7 +99,7 @@ impl ValidationGuiManager {
                 
                 super::text_input_with_title(
                     ui, 
-                    theme, 
+                    &self.theme, 
                     "Password:", 
                     "##user_password_login", 
                     &mut self.password_buffer,
@@ -123,12 +115,12 @@ impl ValidationGuiManager {
                     "Sign Up", 
                     [100.0, 0.0],
                     3.0, 
-                    theme.sign_up_btn_color, 
-                    theme.sign_up_btn_color, 
-                    theme.sign_up_actv_btn_color, 
+                    self.theme.sign_up_btn_color, 
+                    self.theme.sign_up_btn_color, 
+                    self.theme.sign_up_actv_btn_color, 
                 ) {
                     self.error_message.clear();
-                    self.validation_type = ValidationType::SIGN_UP;
+                    self.validation_type = ValidationAction::SIGN_UP;
                 }
 
                 ui.same_line_with_pos(ui.content_region_avail()[0] - 92.0); // No fucking idea why is 92 and not 100.
@@ -137,41 +129,41 @@ impl ValidationGuiManager {
                     "Login", 
                     [100.0, 0.0],
                     3.0, 
-                    theme.positive_btn_color, 
-                    theme.positive_btn_color, 
-                    theme.positive_actv_btn_color,
+                    self.theme.positive_btn_color, 
+                    self.theme.positive_btn_color, 
+                    self.theme.positive_actv_btn_color,
                 ) {
                     if let Ok(new_password) = UUID::from_string(&self.password_buffer) {
                         self.user_creation_info.password = new_password;
                     };
                     self.password_buffer.clear();
 
-                    if let Err(e) = (self.login_fn)(std::mem::take(&mut self.user_creation_info)) {
-                        self.error_message = e.to_string();
-                    }
+                    return true;
                 }
                 
                 // Show error message
                 if !self.error_message.is_empty() {
                     let _font = use_font(ui, FontType::REGULAR17);
                     spacing(ui, 5);
-                    let _text_color_token = ui.push_style_color(imgui::StyleColor::Text, theme.negative_actv_btn_color);
+                    let _text_color_token = ui.push_style_color(imgui::StyleColor::Text, self.theme.negative_actv_btn_color);
                     ui.text(&self.error_message);
                 }
                 
                 table.end();
-            });
-    }
+                
+                false
+            }).unwrap_or(false)
+        }
     
     fn show_sign_up(
         &mut self,
         ui: &mut imgui::Ui,
         renderer: &Renderer,
-        theme: &theme::Theme,
-    ) {
-        super::window(
+    ) -> bool
+    {
+        super::full_screen_window(
             ui, 
-            theme, 
+            &self.theme, 
             "SignUpWindow",
             |ui| {
                 let window_size = ui.window_size();
@@ -182,7 +174,7 @@ impl ValidationGuiManager {
                 {
                     table
                 }
-                else { return; };
+                else { return false; };
     
                 ui.table_setup_column_with(imgui::TableColumnSetup::<&str> { 
                     flags: imgui::TableColumnFlags::WIDTH_FIXED, 
@@ -200,7 +192,7 @@ impl ValidationGuiManager {
                 
                 super::text_input_with_title(
                     ui, 
-                    theme, 
+                    &self.theme, 
                     "Tag:", 
                     "##user_tag_sign_up", 
                     &mut self.user_creation_info.tag, 
@@ -209,7 +201,7 @@ impl ValidationGuiManager {
     
                 super::text_input_with_title(
                     ui, 
-                    theme, 
+                    &self.theme, 
                     "Email:", 
                     "##user_email_sign_up", 
                     &mut self.user_creation_info.email, 
@@ -218,7 +210,7 @@ impl ValidationGuiManager {
     
                 super::text_input_with_title(
                     ui, 
-                    theme, 
+                    &self.theme, 
                     "Password:", 
                     "##user_password_sign_up", 
                     &mut self.password_buffer,
@@ -234,18 +226,16 @@ impl ValidationGuiManager {
                     "Sign Up", 
                     [100.0, 0.0],
                     3.0, 
-                    theme.sign_up_btn_color, 
-                    theme.sign_up_btn_color, 
-                    theme.sign_up_actv_btn_color, 
+                    self.theme.sign_up_btn_color, 
+                    self.theme.sign_up_btn_color, 
+                    self.theme.sign_up_actv_btn_color, 
                 ) {
                     if let Ok(new_password) = UUID::from_string(&self.password_buffer) {
                         self.user_creation_info.password = new_password;
                     }
                     self.password_buffer.clear();
 
-                    if let Err(e) = (self.sign_up_fn)(std::mem::take(&mut self.user_creation_info)) {
-                        self.error_message = e.to_string();
-                    }
+                    return true;
                 }
     
                 ui.same_line_with_pos(ui.content_region_avail()[0] - 92.0); // No fucking idea why is 92 and not 100.
@@ -254,23 +244,25 @@ impl ValidationGuiManager {
                     "Login", 
                     [100.0, 0.0],
                     3.0, 
-                    theme.positive_btn_color, 
-                    theme.positive_btn_color, 
-                    theme.positive_actv_btn_color,
+                    self.theme.positive_btn_color, 
+                    self.theme.positive_btn_color, 
+                    self.theme.positive_actv_btn_color,
                 ) {
                     self.error_message.clear();
-                    self.validation_type = ValidationType::LOGIN;
+                    self.validation_type = ValidationAction::LOGIN;
                 }
                 
                 // Show error message
                 if !self.error_message.is_empty() {
                     let _font = use_font(ui, FontType::REGULAR17);
                     spacing(ui, 5);
-                    let _text_color_token = ui.push_style_color(imgui::StyleColor::Text, theme.negative_actv_btn_color);
+                    let _text_color_token = ui.push_style_color(imgui::StyleColor::Text, self.theme.negative_actv_btn_color);
                     ui.text(&self.error_message);
                 }
                 
                 table.end();
-            });
+                
+                false
+            }).unwrap_or(false)
     }
 }

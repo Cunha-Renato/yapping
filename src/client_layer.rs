@@ -16,8 +16,8 @@ pub struct ClientLayer {
     client_manager: ClientManager,
 }
 impl ClientLayer {
-    pub fn new(app_core: ApplicationCore) -> Self {
-        let server_coms = Rfc::new(ServerCommunication::default());
+    pub(crate) fn new(app_core: ApplicationCore) -> Self {
+        let server_coms = Rfc::new(ServerCommunication::new());
         let _ = server_coms.borrow_mut().try_connect("ws://127.0.0.1:8080");
 
         Self {
@@ -51,12 +51,14 @@ impl Layer for ClientLayer {
     }
 
     fn on_update(&mut self) -> Result<(), StdError> {
-        let _ = self.server_coms.borrow_mut().on_update();
-        
+        if let Err(e) = self.server_coms.borrow_mut().on_update() {
+            error!("{e}");
+        }
+
         Ok(())
     }
 
-    fn on_event(&mut self, event: &LgEvent) -> bool {
+    fn on_event(&mut self, _event: &LgEvent) -> bool {
         false
     }
 
