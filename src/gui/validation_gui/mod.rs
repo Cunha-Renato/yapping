@@ -3,41 +3,6 @@ use crate::gui::{get_logo_texture_id, spacing, text_input, theme::Theme, use_fon
 
 pub(crate) mod validation_gui_manager;
 
-fn full_screen_window<F, R>(
-    ui: &mut imgui::Ui,
-    theme: &Theme,
-    title: &str,
-    func: F,
-) -> Option<R>
-where
-    F: FnOnce(&imgui::Ui) -> R
-{
-    let _window_bg = ui.push_style_color(imgui::StyleColor::WindowBg, theme.main_bg_color);
-
-    let mut current_size = ui.io().display_size;
-    let min_size = [410.0, 610.0];
-
-    if current_size[0] < min_size[0] || current_size[1] < min_size[1] {
-        let new_size = [
-            current_size[0].max(min_size[0]),
-            current_size[1].max(min_size[1]),
-        ];
-
-        current_size = new_size;
-    };
-
-    ui.window(title)
-        .position([0.0, 0.0], imgui::Condition::Always)
-        .size(current_size, imgui::Condition::Always)
-        .flags(imgui::WindowFlags::NO_TITLE_BAR
-            | imgui::WindowFlags::NO_RESIZE
-            | imgui::WindowFlags::NO_SCROLLBAR
-            | imgui::WindowFlags::NO_SCROLL_WITH_MOUSE
-            | imgui::WindowFlags::NO_MOVE
-        )
-        .build(|| func(&ui))
-}
-
 fn display_logo(renderer: &Renderer, ui: &imgui::Ui) {
     let window_size = ui.window_size();
 
@@ -66,6 +31,7 @@ fn text_input_with_title(
     let _padding = ui.push_style_var(imgui::StyleVar::FramePadding([5.0, 5.0]));
     text_input(
         ui, 
+        "",
         buffer, 
         label, 
         theme.input_text_bg_light, 

@@ -1,5 +1,9 @@
 use std::cell::OnceCell;
-use yapping_core::l3gion_rust::{imgui, lg_core::renderer::{texture::{TextureFilter, TextureFormat, TextureSpecs}, Renderer}, StdError, UUID};
+use yapping_core::l3gion_rust::{imgui, lg_core::{renderer::{texture::{TextureFilter, TextureFormat, TextureSpecs}, Renderer}, window::LgWindow}, StdError, UUID};
+
+pub(crate) mod theme;
+pub(crate) mod validation_gui;
+pub(crate) mod sidebar_gui;
 
 const BORDER_RADIUS: f32 = 3.0;
 
@@ -20,15 +24,13 @@ struct Fonts {
 }
 
 static LOGO_PATH: &str = "assets/textures/logo.png";
+static mut NEXT_WINDOW_SPECS: ([f32; 2], [f32; 2]) = ([0.0; 2], [0.0; 2]);
 
 thread_local! {
     static FONTS: OnceCell<Fonts> = OnceCell::new();
 }
 
-pub(crate) mod theme;
-pub(crate) mod validation_gui;
-
-pub(crate) fn init_gui(renderer: &mut Renderer) -> Result<(), StdError> {
+pub(crate) fn init_gui(renderer: &mut Renderer, window: &LgWindow) -> Result<(), StdError> {
     // Saving Logo Image
     {
         let specs = TextureSpecs {
@@ -94,6 +96,92 @@ pub(crate) fn init_gui(renderer: &mut Renderer) -> Result<(), StdError> {
     Ok(())
 }
 
+fn window<F, R>(
+    ui: &imgui::Ui,
+    title: &str,
+    position: [f32; 2],
+    size: [f32; 2],
+    min_size: [f32; 2],
+    bg_color: [f32; 4],
+    func: F,
+) -> Option<R>
+where
+    F: FnOnce(&imgui::Ui) -> R
+{
+    let _window_bg = ui.push_style_color(imgui::StyleColor::WindowBg, bg_color);
+    let _window_border = ui.push_style_var(imgui::StyleVar::WindowBorderSize(0.0));
+    let _window_min_size = ui.push_style_var(imgui::StyleVar::WindowMinSize(min_size));
+    let _window_padding = ui.push_style_var(imgui::StyleVar::WindowPadding([0.0; 2]));
+
+    ui.window(title)
+        .position(position, imgui::Condition::Always)
+        .size(size, imgui::Condition::Always)
+        .flags(imgui::WindowFlags::NO_TITLE_BAR
+            | imgui::WindowFlags::NO_SCROLLBAR
+            | imgui::WindowFlags::NO_SCROLL_WITH_MOUSE
+            | imgui::WindowFlags::NO_MOVE
+        )
+        .build(|| func(&ui))
+}
+
+fn no_resize_child_window<F, R>(
+    ui: &imgui::Ui,
+    title: &str,
+    flags: Option<imgui::WindowFlags>,
+    size: [f32; 2],
+    padding: [f32; 2],
+    bg_color: [f32; 4],
+    func: F,
+) -> Option<R>
+where
+    F: FnOnce(&imgui::Ui) -> R
+{
+    let _window_bg = ui.push_style_color(imgui::StyleColor::ChildBg, bg_color);
+    let _window_padding = ui.push_style_var(imgui::StyleVar::WindowPadding(padding));
+
+    ui.child_window(title)
+        .size(size)
+        .flags(imgui::WindowFlags::NO_TITLE_BAR
+            | imgui::WindowFlags::NO_RESIZE
+            | imgui::WindowFlags::NO_MOVE
+            | imgui::WindowFlags::ALWAYS_USE_WINDOW_PADDING
+            | flags.unwrap_or(imgui::WindowFlags::empty())
+        )
+        .build(|| func(&ui))
+}
+
+fn no_resize_window<F, R>(
+    ui: &imgui::Ui,
+    title: &str,
+    flags: Option<imgui::WindowFlags>,
+    position: [f32; 2],
+    size: [f32; 2],
+    padding: [f32; 2],
+    min_size: [f32; 2],
+    bg_color: [f32; 4],
+    func: F,
+) -> Option<R>
+where
+    F: FnOnce(&imgui::Ui) -> R
+{
+    let _window_bg = ui.push_style_color(imgui::StyleColor::WindowBg, bg_color);
+    let _window_border = ui.push_style_var(imgui::StyleVar::WindowBorderSize(0.0));
+    let _window_min_size = ui.push_style_var(imgui::StyleVar::WindowMinSize(min_size));
+    let _window_padding = ui.push_style_var(imgui::StyleVar::WindowPadding(padding));
+
+    ui.window(title)
+        .position(position, imgui::Condition::Always)
+        .size(size, imgui::Condition::Always)
+        .flags(imgui::WindowFlags::NO_TITLE_BAR
+            | imgui::WindowFlags::NO_RESIZE
+            | imgui::WindowFlags::NO_SCROLLBAR
+            | imgui::WindowFlags::NO_SCROLL_WITH_MOUSE
+            | imgui::WindowFlags::NO_MOVE
+            | flags.unwrap_or(imgui::WindowFlags::empty())
+        )
+        .build(|| func(&ui))
+}
+
 fn get_logo_texture_id(renderer: &Renderer) -> Option<imgui::TextureId> {
     match renderer.get_texture(&UUID::from_string(LOGO_PATH).unwrap())
     {
@@ -135,24 +223,22 @@ fn use_font(ui: &imgui::Ui, font_type: FontType) -> imgui::FontStackToken {
 
 fn text_input(
     ui: &imgui::Ui, 
+    hint: &str,
     buffer: &mut String, 
     label: &str, 
     bg_color: [f32; 4],
     text_color: [f32; 4],
     border_radius: f32,
     flags: imgui::InputTextFlags
-) {
-    let bg_color_token = ui.push_style_color(imgui::StyleColor::FrameBg, bg_color);
-    let text_color_token = ui.push_style_color(imgui::StyleColor::Text, text_color);
-    let frame_rounding = ui.push_style_var(imgui::StyleVar::FrameRounding(border_radius));
+) -> bool {
+    let _bg_color_token = ui.push_style_color(imgui::StyleColor::FrameBg, bg_color);
+    let _text_color_token = ui.push_style_color(imgui::StyleColor::Text, text_color);
+    let _frame_rounding = ui.push_style_var(imgui::StyleVar::FrameRounding(border_radius));
 
     ui.input_text(label, buffer)
+        .hint(hint)
         .flags(flags)
-        .build();
-
-    bg_color_token.end();
-    text_color_token.end();
-    frame_rounding.end();
+        .build()
 }
 
 fn button(
@@ -186,6 +272,20 @@ fn spacing(ui: &imgui::Ui, quantity: u32) {
     }
 }
 
+fn centered_component<R>(
+    ui: &imgui::Ui,
+    component_size: [f32; 2],
+    component: impl FnOnce(&imgui::Ui, [f32; 2]) -> R
+) -> R 
+{
+    let size = ui.window_size();
+    let x = (size[0] - component_size[0]) / 2.0; 
+    
+    ui.set_cursor_pos([x, ui.cursor_pos()[1]]);
+    
+    component(ui, component_size)
+}
+
 pub(super) fn show_loading_gui(
     ui: &imgui::Ui, 
     renderer: &Renderer,
@@ -193,17 +293,16 @@ pub(super) fn show_loading_gui(
     size: [f32; 2],
     bg_color: [f32; 4],
 ) {
-    let _window_bg = ui.push_style_color(imgui::StyleColor::WindowBg, bg_color);
-    ui.window("Loading Window")
-        .position(position, imgui::Condition::Always)
-        .size(size, imgui::Condition::Always)
-        .flags(imgui::WindowFlags::NO_TITLE_BAR
-            | imgui::WindowFlags::NO_RESIZE
-            | imgui::WindowFlags::NO_SCROLLBAR
-            | imgui::WindowFlags::NO_SCROLL_WITH_MOUSE
-            | imgui::WindowFlags::NO_MOVE
-        ) 
-        .build(|| {
+    no_resize_window(
+        ui, 
+        "Loading Window", 
+        None,
+        [0.0, 0.0], 
+        ui.io().display_size, 
+        [0.0, 0.0], 
+        [0.0, 0.0], 
+        bg_color, 
+        |ui| {
             let content_size = ui.content_region_avail();
             let logo_size = content_size[0] / 3.0;
             

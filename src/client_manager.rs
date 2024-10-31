@@ -1,15 +1,17 @@
 use std::rc::Rc;
 
-use yapping_core::{l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::info, AsLgTime, Rfc, StdError}, server_message::{ClientMessageContent, ServerMessage, ServerMessageContent, SuccessType}, user::{User, UserCreationInfo}};
-use crate::{gui::{show_loading_gui, theme::Theme, validation_gui::validation_gui_manager::{ValidationAction, ValidationGuiManager}}, server_coms::ServerCommunication, ClientMessage};
+use yapping_core::{l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, AsLgTime, Rfc, StdError}, server_message::{ClientMessageContent, ServerMessage, ServerMessageContent, SuccessType}, user::{User, UserCreationInfo}};
+use crate::{gui::{show_loading_gui, sidebar_gui::SidebarManager, theme::Theme, validation_gui::validation_gui_manager::{ValidationAction, ValidationGuiManager}}, server_coms::ServerCommunication, ClientMessage};
 
 struct GUIManagers {
     validation: ValidationGuiManager,
+    sidebar: SidebarManager,
 }
 impl GUIManagers {
     fn new(theme: Rc<Theme>) -> Self {
         Self {
-            validation: ValidationGuiManager::new(theme),
+            validation: ValidationGuiManager::new(Rc::clone(&theme)),
+            sidebar: SidebarManager::new(theme),
         }
     }
 }
@@ -62,6 +64,12 @@ impl ClientManager {
             ForegroundState::FRIENDS_PAGE => todo!(),
         } 
     }
+    
+    pub(crate) fn shutdown(&mut self) -> Result<(), StdError> {
+        error!("Shutdown: Not Implemented!");
+        
+        Ok(())
+    }
 }
 impl ClientManager {
     fn on_validation(&mut self, ui: &mut imgui::Ui, renderer: &Renderer) {
@@ -85,6 +93,9 @@ impl ClientManager {
     }
 
     fn on_main_page(&mut self, ui: &mut imgui::Ui, renderer: &Renderer) {
-
+        if let Some(user) = &self.current_user {
+            self.gui_managers.sidebar.on_imgui(ui, renderer, user.friends());
+        }
+        // test(ui, renderer, &self.theme);
     }
 }

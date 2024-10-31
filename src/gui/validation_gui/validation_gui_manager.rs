@@ -29,10 +29,6 @@ impl ValidationGuiManager {
         }
     }
 
-    pub(crate) fn set_error_message(&mut self, message: &str) {
-        self.error_message = message.to_string();
-    }
-
     pub(crate) fn on_imgui(
         &mut self,
         ui: &mut imgui::Ui,
@@ -58,10 +54,15 @@ impl ValidationGuiManager {
         renderer: &Renderer,
     ) -> bool
     {
-        super::full_screen_window(
+        no_resize_window(
             ui,
-            &self.theme,
             "LoginWindow",
+            None,
+            [0.0, 0.0],
+            ui.io().display_size,
+            [0.0, 0.0],
+            [410.0, 610.0],
+            self.theme.main_bg_color,
             |ui| {
                 let window_size = ui.window_size();
 
@@ -120,10 +121,12 @@ impl ValidationGuiManager {
                     self.theme.sign_up_actv_btn_color, 
                 ) {
                     self.error_message.clear();
+                    self.password_buffer.clear();
+                    self.user_creation_info = UserCreationInfo::default();
                     self.validation_type = ValidationAction::SIGN_UP;
                 }
 
-                ui.same_line_with_pos(ui.content_region_avail()[0] - 92.0); // No fucking idea why is 92 and not 100.
+                ui.same_line_with_pos(ui.content_region_avail()[0] - 100.0);
                 if button(
                     ui, 
                     "Login", 
@@ -161,10 +164,15 @@ impl ValidationGuiManager {
         renderer: &Renderer,
     ) -> bool
     {
-        super::full_screen_window(
-            ui, 
-            &self.theme, 
-            "SignUpWindow",
+        no_resize_window(
+            ui,
+            "LoginWindow",
+            None,
+            [0.0, 0.0],
+            ui.io().display_size,
+            [0.0, 0.0],
+            [410.0, 610.0],
+            self.theme.main_bg_color,
             |ui| {
                 let window_size = ui.window_size();
     
@@ -238,7 +246,7 @@ impl ValidationGuiManager {
                     return true;
                 }
     
-                ui.same_line_with_pos(ui.content_region_avail()[0] - 92.0); // No fucking idea why is 92 and not 100.
+                ui.same_line_with_pos(ui.content_region_avail()[0] - 100.0);
                 if button(
                     ui, 
                     "Login", 
@@ -249,6 +257,8 @@ impl ValidationGuiManager {
                     self.theme.positive_actv_btn_color,
                 ) {
                     self.error_message.clear();
+                    self.password_buffer.clear();
+                    self.user_creation_info = UserCreationInfo::default();
                     self.validation_type = ValidationAction::LOGIN;
                 }
                 

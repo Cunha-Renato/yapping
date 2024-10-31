@@ -39,7 +39,7 @@ impl Layer for ClientLayer {
 
     fn on_attach(&mut self) -> Result<(), StdError> {
         info!("ClientLayer attached!");
-        gui::init_gui(&mut self.app_core.renderer.borrow_mut())?;
+        gui::init_gui(&mut self.app_core.renderer.borrow_mut(), &self.app_core.window.borrow())?;
         self.client_manager.init()?;
 
         Ok(())
@@ -47,6 +47,8 @@ impl Layer for ClientLayer {
 
     fn on_detach(&mut self) -> Result<(), StdError> {
         info!("ClientLayer detached!");
+        self.client_manager.shutdown()?;
+
         Ok(())
     }
 
