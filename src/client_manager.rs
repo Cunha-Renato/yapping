@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
-use yapping_core::{client_server_coms::{Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, AsLgTime, Rfc, StdError}, user::{User, UserCreationInfo}};
-use crate::{gui::{show_loading_gui, sidebar_gui::SidebarManager, theme::Theme, validation_gui::validation_gui_manager::{ValidationAction, ValidationGuiManager}}, server_coms::ServerCommunication};
+use yapping_core::{client_server_coms::{Notification, Query, Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, AsLgTime, Rfc, StdError}, user::{User, UserCreationInfo}};
+use crate::{gui::{show_loading_gui, sidebar_gui::{SidebarAction, SidebarManager}, theme::Theme, validation_gui::validation_gui_manager::{ValidationAction, ValidationGuiManager}}, server_coms::ServerCommunication};
 
 struct GUIManagers {
     validation: ValidationGuiManager,
@@ -103,9 +103,25 @@ impl ClientManager {
     }
 
     fn on_main_page(&mut self, ui: &mut imgui::Ui, renderer: &Renderer) {
+        self.on_sidebar(ui, renderer);
+    }
+
+    fn on_sidebar(&mut self, ui: &mut imgui::Ui, renderer: &Renderer) {
         if let Some(user) = &self.current_user {
-            self.gui_managers.sidebar.on_imgui(ui, renderer, user.friends());
+            self.gui_managers.sidebar.on_imgui(
+                ui, 
+                renderer, 
+                user.friends(),
+                |action| {
+                    if let Err(e) = match action {
+                        SidebarAction::FIND_NEW_FRIEND(friend_tag) => {
+                            self.foreground_state = ForegroundState::FRIENDS_PAGE;
+                            self.server_coms.borrow_mut().send(&ServerMessage::from(ServerMessageContent::QUERY(Query::USERS_CONTAINS_TAG(friend_tag))))
+                        },
+                    } {
+                        error!("During Sidebar::on_imgui! {}", e);
+                    };
+                });
         }
-        // test(ui, renderer, &self.theme);
     }
 }

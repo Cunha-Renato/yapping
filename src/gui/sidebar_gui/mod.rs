@@ -3,6 +3,12 @@ use std::rc::Rc;
 use yapping_core::{l3gion_rust::{imgui, lg_core::{input::LgInput, renderer::Renderer}, sllog::warn}, user::User};
 use super::{button, centered_component, no_resize_child_window, no_resize_window, spacing, text_input, theme, use_font, NEXT_WINDOW_SPECS};
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone)]
+pub(crate) enum SidebarAction {
+    FIND_NEW_FRIEND(String),
+}
+
 pub(crate) struct SidebarManager {
     theme: Rc<theme::Theme>,
     friend_tag: String,
@@ -15,7 +21,13 @@ impl SidebarManager {
         }
     }
 
-    pub(crate) fn on_imgui(&mut self, ui: &imgui::Ui, renderer: &Renderer, friends: &[User]) {
+    pub(crate) fn on_imgui(
+        &mut self, 
+        ui: &imgui::Ui, 
+        renderer: &Renderer, 
+        friends: &[User],
+        mut func: impl FnMut(SidebarAction)
+    ) {
         let window_size = [200.0, ui.io().display_size[1]];
 
         no_resize_window(
@@ -53,7 +65,7 @@ impl SidebarManager {
                 spacing(ui, 1);
                 _fonts.push(use_font(ui, super::FontType::REGULAR17));
                 if self.show_friend_search(ui) {
-                    warn!("Search for User: {}", self.friend_tag);
+                    func(SidebarAction::FIND_NEW_FRIEND(self.friend_tag.clone()));
                     self.friend_tag.clear();
                 }
                 
