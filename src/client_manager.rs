@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
-use yapping_core::{l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, AsLgTime, Rfc, StdError}, server_message::{ClientMessageContent, ServerMessage, ServerMessageContent, SuccessType}, user::{User, UserCreationInfo}};
-use crate::{gui::{show_loading_gui, sidebar_gui::SidebarManager, theme::Theme, validation_gui::validation_gui_manager::{ValidationAction, ValidationGuiManager}}, server_coms::ServerCommunication, ClientMessage};
+use yapping_core::{client_server_coms::{Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, AsLgTime, Rfc, StdError}, user::{User, UserCreationInfo}};
+use crate::{gui::{show_loading_gui, sidebar_gui::SidebarManager, theme::Theme, validation_gui::validation_gui_manager::{ValidationAction, ValidationGuiManager}}, server_coms::ServerCommunication};
 
 struct GUIManagers {
     validation: ValidationGuiManager,
@@ -76,17 +76,27 @@ impl ClientManager {
         self.gui_managers.validation.on_imgui(ui, renderer, |v_action, info| {
             match match v_action {
                 // Sending and waiting for response;
-                ValidationAction::LOGIN => self.server_coms.borrow_mut().send_and_wait(1_u32.s(), &ClientMessage::new(ClientMessageContent::LOGIN(info))),
-                ValidationAction::SIGN_UP => self.server_coms.borrow_mut().send_and_wait(1_u32.s(), &ClientMessage::new(ClientMessageContent::SIGN_UP(info)))
+                ValidationAction::LOGIN => self.server_coms.borrow_mut()
+                    .send_and_wait(
+                        1_u32.s(), 
+                        &ServerMessage::from(ServerMessageContent::SESSION(Session::LOGIN(info)))
+                    ),
+                ValidationAction::SIGN_UP => self.server_coms.borrow_mut()
+                    .send_and_wait(
+                        1_u32.s(), 
+                        &ServerMessage::from(ServerMessageContent::SESSION(Session::SIGN_UP(info))))
             }? {
                 // Dealing with the received message;
-                ServerMessageContent::SUCCESS(SuccessType::LOGIN(user) | SuccessType::SIGN_UP(user)) => {
-                    self.foreground_state = ForegroundState::MAIN_PAGE;
-                    self.current_user = Some(user);
-
-                    Ok(())
-                },
-                ServerMessageContent::FAIL(e) => Err(e.into()),
+                ServerMessageContent::RESPONSE(response) => match response {
+                    Response::OK_SESSION(Session::TOKEN(user)) => {
+                        self.foreground_state = ForegroundState::MAIN_PAGE;
+                        self.current_user = Some(user);
+                    
+                        Ok(())
+                    }
+                    Response::Err(e) => Err(e.into()),
+                    _ => Err("Got wrong response from the Server!".into()),
+                }
                 _ => Err("Got wrong response from the Server!".into()),
             }
         });

@@ -6,7 +6,7 @@ use websocket::sync::{Reader, Writer};
 use yapping_core::l3gion_rust::lg_types::units_of_time::LgTime;
 use yapping_core::l3gion_rust::sllog::error;
 use yapping_core::l3gion_rust::{AsLgTime, LgTimer, StdError, UUID};
-use yapping_core::server_message::{ClientMessage, ServerMessage, ServerMessageContent};
+use yapping_core::client_server_coms::{ServerMessage, ServerMessageContent};
 
 pub(crate) struct ServerCommunication {
     connected: bool,
@@ -69,7 +69,7 @@ impl ServerCommunication {
         return Ok(());
     }
 
-    pub(crate) fn send(&mut self, message: &ClientMessage) -> Result<(), StdError> {
+    pub(crate) fn send(&mut self, message: &ServerMessage) -> Result<(), StdError> {
         let writer = self.writer.as_mut().ok_or("Client is not connected to server! Cannot send message!")?;
 
         let message = Message::binary(yapping_core::bincode::serialize(&message)?);
@@ -84,7 +84,7 @@ impl ServerCommunication {
         Ok(())
     }
 
-    pub(crate) fn send_and_wait(&mut self, timeout: LgTime, message: &ClientMessage) -> Result<ServerMessageContent, StdError> {
+    pub(crate) fn send_and_wait(&mut self, timeout: LgTime, message: &ServerMessage) -> Result<ServerMessageContent, StdError> {
         self.send(message)?;
         let rx = self.message_rx.as_mut().ok_or("Client is not connected to the Server!")?;
 
@@ -99,7 +99,7 @@ impl ServerCommunication {
             }
         }
         
-        Ok(self.received_messages.remove(&message.uuid).ok_or("Response was not received!")?)
+        Err("Response was not received!".into())
     }
 }
 impl ServerCommunication {

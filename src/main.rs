@@ -1,4 +1,4 @@
-use yapping_core::{l3gion_rust::{as_dyn, lg_core::{application::{ApplicationCreateInfo, L3gion}, layer::Layer, renderer::CreationWindowInfo}, Rfc}, server_message::ClientMessage};
+use yapping_core::l3gion_rust::{as_dyn, lg_core::{application::{ApplicationCreateInfo, L3gion}, layer::Layer, renderer::CreationWindowInfo}, Rfc};
 
 
 mod client_layer;
