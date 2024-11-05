@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy)]
+use std::fmt::Debug;
+
+#[derive(Clone, Copy)]
 pub(crate) struct Theme {
     pub(crate) font_color: [f32; 4],
     pub(crate) main_bg_color: [f32; 4],
@@ -13,6 +15,25 @@ pub(crate) struct Theme {
     pub(crate) accent_color: [f32; 4],
     pub(crate) input_text_bg_light: [f32; 4],
     pub(crate) input_text_bg_dark: [f32; 4],
+}
+impl Debug for Theme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Theme")
+        .field("font_color", &format_args!("{:?}", &self.font_color))
+        .field("main_bg_color", &format_args!("{:?}", &self.main_bg_color))
+        .field("left_panel_bg_color", &format_args!("{:?}", &self.left_panel_bg_color))
+        .field("mini_pop_up_color", &format_args!("{:?}", &self.mini_pop_up_color))
+        .field("positive_btn_color", &format_args!("{:?}", &self.positive_btn_color))
+        .field("positive_actv_btn_color", &format_args!("{:?}", &self.positive_actv_btn_color))
+        .field("negative_btn_color", &format_args!("{:?}", &self.negative_btn_color))
+        .field("negative_actv_btn_color", &format_args!("{:?}", &self.negative_actv_btn_color))
+        .field("sign_up_btn_color", &format_args!("{:?}", &self.sign_up_btn_color))
+        .field("sign_up_actv_btn_color", &format_args!("{:?}", &self.sign_up_actv_btn_color))
+        .field("accent_color", &format_args!("{:?}", &self.accent_color))
+        .field("input_text_bg_light", &format_args!("{:?}", &self.input_text_bg_light))
+        .field("input_text_bg_dark", &format_args!("{:?}", &self.input_text_bg_dark))
+        .finish()
+    }
 }
 
 pub(crate) static MAIN_THEME: Theme = Theme {

@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt::Debug, rc::Rc};
 
 use yapping_core::{l3gion_rust::{imgui, lg_core::renderer::Renderer}, user::UserCreationInfo};
 use crate::gui::*;
@@ -274,5 +274,15 @@ impl ValidationGuiManager {
                 
                 false
             }).unwrap_or(false)
+    }
+}
+impl Debug for ValidationGuiManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ValidationGuiManager")
+            .field("password_buffer", &self.password_buffer)
+            .field("user_creation_info", &self.user_creation_info)
+            .field("error_message", &self.error_message)
+            .field("validation_type", &self.validation_type)
+            .finish()
     }
 }

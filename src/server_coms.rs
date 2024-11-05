@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::fmt::Display;
 use std::net::TcpStream;
 use std::sync::mpsc::Receiver;
 use websocket::{ClientBuilder, Message};
@@ -6,7 +6,7 @@ use websocket::sync::{Reader, Writer};
 use yapping_core::l3gion_rust::lg_types::units_of_time::LgTime;
 use yapping_core::l3gion_rust::sllog::error;
 use yapping_core::l3gion_rust::{AsLgTime, LgTimer, StdError, UUID};
-use yapping_core::client_server_coms::{ServerMessage, ServerMessageContent};
+use yapping_core::client_server_coms::{ComsManager, Response, ServerMessage, ServerMessageContent};
 
 pub(crate) struct ServerCommunication {
     connected: bool,
@@ -14,8 +14,8 @@ pub(crate) struct ServerCommunication {
     server_ip: String,
     writer: Option<Writer<TcpStream>>,
     message_rx: Option<Receiver<ServerMessage>>,
-
-    received_messages: HashMap<UUID, ServerMessageContent>,
+    
+    manager: ComsManager,
 }
 impl ServerCommunication {
     pub(crate) fn new() -> Self {
@@ -24,7 +24,7 @@ impl ServerCommunication {
             timer: LgTimer::new(), server_ip: String::default(),
             writer: None,
             message_rx: None,
-            received_messages: HashMap::default(),
+            manager: ComsManager::default(),
         }
     }
 
@@ -32,12 +32,8 @@ impl ServerCommunication {
         self.connected
     }
 
-    fn is_connected(&mut self) -> bool {
-        if let Some(writer) = &self.writer {
-            self.connected = writer.stream.peer_addr().is_ok();
-        }
-        
-        self.connected
+    pub(crate) fn get_messages(&mut self) -> Vec<(ServerMessageContent, Response)> {
+        self.manager.sent_responded()
     }
     
     pub(crate) fn on_update(&mut self) -> Result<(), StdError> {
@@ -51,8 +47,13 @@ impl ServerCommunication {
         
         if let Some(rx) = &mut self.message_rx {
             while let Ok(msg) = rx.try_recv() {
-                self.received_messages.insert(msg.uuid, msg.content);
+                self.manager.received(msg);
             }
+        }
+        
+        self.manager.update();
+        for to_rety in self.manager.to_retry() {
+            self.send(to_rety)?;
         }
 
         Ok(())
@@ -69,23 +70,16 @@ impl ServerCommunication {
         return Ok(());
     }
 
-    pub(crate) fn send(&mut self, message: &ServerMessage) -> Result<(), StdError> {
-        let writer = self.writer.as_mut().ok_or("Client is not connected to server! Cannot send message!")?;
-
-        let message = Message::binary(yapping_core::bincode::serialize(&message)?);
-
-        if writer.send_message(&message).is_err() {
-            writer.stream.shutdown(std::net::Shutdown::Both).map_err(|_| "Client is not connected to server! Cannot send message!")?;
-            
-            self.writer = None;
-            self.connected = false;
-        }
+    pub(crate) fn send(&mut self, message: ServerMessage) -> Result<(), StdError> {
+        self.send_to_server(&message)?;
+        self.manager.sent(message);
 
         Ok(())
     }
 
-    pub(crate) fn send_and_wait(&mut self, timeout: LgTime, message: &ServerMessage) -> Result<ServerMessageContent, StdError> {
-        self.send(message)?;
+    pub(crate) fn send_and_wait(&mut self, timeout: LgTime, message: ServerMessage) -> Result<ServerMessageContent, StdError> {
+        self.send_to_server(&message)?;
+
         let rx = self.message_rx.as_mut().ok_or("Client is not connected to the Server!")?;
 
         let timer = LgTimer::new();
@@ -95,14 +89,37 @@ impl ServerCommunication {
                     return Ok(msg.content);
                 }
 
-                self.received_messages.insert(msg.uuid, msg.content);
+                self.manager.sent(msg);
             }
         }
         
         Err("Response was not received!".into())
     }
 }
+// Private
 impl ServerCommunication {
+    fn is_connected(&mut self) -> bool {
+        if let Some(writer) = &self.writer {
+            self.connected = writer.stream.peer_addr().is_ok();
+        }
+        
+        self.connected
+    }
+    
+    fn send_to_server(&mut self, message: &ServerMessage) -> Result<(), StdError> {
+        let writer = self.writer.as_mut().ok_or("Client is not connected to server! Cannot send message!")?;
+        let bin_message = Message::binary(yapping_core::bincode::serialize(&message)?);
+
+        if writer.send_message(&bin_message).is_err() {
+            writer.stream.shutdown(std::net::Shutdown::Both).map_err(|_| "Client is not connected to server! Cannot send message!")?;
+            
+            self.writer = None;
+            self.connected = false;
+        }
+        
+        Ok(())
+    }
+
     fn start_reading(&mut self, mut reader: Reader<TcpStream>) {
         let (tx, rx) = std::sync::mpsc::channel();
         self.message_rx = Some(rx);
@@ -122,6 +139,11 @@ impl ServerCommunication {
                 },
             }
         });
+    }
+}
+impl Display for ServerCommunication {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ServerCommunication:\n\tconnected: {}\n\tmanager: {:#?}", self.connected, self.manager)
     }
 }
 impl Drop for ServerCommunication {

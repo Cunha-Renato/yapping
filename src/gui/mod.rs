@@ -4,11 +4,12 @@ use yapping_core::l3gion_rust::{imgui, lg_core::{renderer::{texture::{TextureFil
 pub(crate) mod theme;
 pub(crate) mod validation_gui;
 pub(crate) mod sidebar_gui;
+pub(crate) mod friends_page_gui;
 
 const BORDER_RADIUS: f32 = 3.0;
 
 #[derive(Debug, Clone, Copy)]
-enum FontType {
+pub(crate) enum FontType {
     REGULAR17,
     REGULAR24,
     BOLD17,
@@ -177,6 +178,7 @@ where
             | imgui::WindowFlags::NO_SCROLLBAR
             | imgui::WindowFlags::NO_SCROLL_WITH_MOUSE
             | imgui::WindowFlags::NO_MOVE
+            | imgui::WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS
             | flags.unwrap_or(imgui::WindowFlags::empty())
         )
         .build(|| func(&ui))
@@ -206,7 +208,7 @@ fn show_logo(
     }
 }
 
-fn use_font(ui: &imgui::Ui, font_type: FontType) -> imgui::FontStackToken {
+pub(crate) fn use_font(ui: &imgui::Ui, font_type: FontType) -> imgui::FontStackToken {
     FONTS.with(|font| {
         let font = font.get().unwrap();
         

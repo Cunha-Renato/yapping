@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt::Debug, rc::Rc};
 
 use yapping_core::{l3gion_rust::{imgui, lg_core::{input::LgInput, renderer::Renderer}, sllog::warn}, user::User};
 use super::{button, centered_component, no_resize_child_window, no_resize_window, spacing, text_input, theme, use_font, NEXT_WINDOW_SPECS};
@@ -74,8 +74,6 @@ impl SidebarManager {
             });
         
         unsafe { NEXT_WINDOW_SPECS = ([window_size[0], 0.0], [ui.io().display_size[0] - window_size[0], ui.io().display_size[1]]) };
-        
-        test(ui, renderer);
     }
 }
 impl SidebarManager {
@@ -105,6 +103,7 @@ impl SidebarManager {
                 ui.set_cursor_pos([ui.cursor_pos()[0], ui.cursor_pos()[1] + 1.0]);
                 ui.set_next_item_width(ui.content_region_avail()[0] - 1.0);
                 let _padding = ui.push_style_var(imgui::StyleVar::FramePadding([5.0, 5.0]));
+
                 text_input(
                     ui, 
                     "User Tag",
@@ -135,7 +134,11 @@ impl SidebarManager {
             // self.theme.left_panel_bg_color, 
             |ui| {
                 let _window_rounding = ui.push_style_var(imgui::StyleVar::ChildRounding(5.0));
-                for (i, friend) in friends.iter().enumerate() {
+                for (i, friend) in friends
+                    .iter()
+                    .enumerate() 
+                    .filter(|(_, friend)| friend.tag().to_lowercase().contains(&self.friend_tag.to_lowercase()))
+                {
                     no_resize_child_window(
                         ui, 
                         &std::format!("friend_{}", i), 
@@ -164,22 +167,10 @@ impl SidebarManager {
             });
     }
 }
-
-pub(crate) fn test(ui: &imgui::Ui, renderer: &Renderer) {
-    let (window_pos, window_size) = unsafe { NEXT_WINDOW_SPECS };
-
-    no_resize_window(
-        ui, 
-        "test", 
-        None,
-        window_pos,
-        window_size, 
-        [0.0, 0.0],
-        window_size, 
-        [0.3, 0.3, 0.3, 1.0],
-        |ui| {
-            ui.text("TEST");
-        });
-    
-    unsafe { NEXT_WINDOW_SPECS = ([0.0; 2], [0.0; 2]); }
+impl Debug for SidebarManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SidebarManager")
+            .field("friend_tag", &self.friend_tag)
+            .finish()
+    }
 }
