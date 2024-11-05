@@ -54,7 +54,23 @@ impl ClientManager {
     }
 
     pub(crate) fn on_server_message(&mut self, messages: Vec<(ServerMessageContent, Response)>) -> Result<(), StdError> {
-        // TODO:
+        for (msg, response) in messages {
+            match (msg, response) {
+                (ServerMessageContent::NOTIFICATION(_), Response::OK_NOTIFICATION(_)) => todo!(),
+                (ServerMessageContent::MODIFICATION(_), Response::OK_MODIFICATION(_)) => todo!(),
+                (ServerMessageContent::QUERY(_), Response::OK_QUERY(Query::RESULT(result))) => {
+                    if let Some(user) = &self.current_user {
+                        let friends = result.into_iter()
+                            .filter(|u| u.uuid() != user.uuid())
+                            .collect();
+                        
+                        self.gui_managers.friend_page.set_friends(friends);
+                    }
+                },
+                (_, Response::Err(e)) => error!("{e}"),
+                _ => (),
+            }
+        }
         
         Ok(())
     }

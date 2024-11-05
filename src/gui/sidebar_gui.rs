@@ -1,7 +1,7 @@
 use std::{fmt::Debug, rc::Rc};
 
 use yapping_core::{l3gion_rust::{imgui, lg_core::{input::LgInput, renderer::Renderer}, sllog::warn}, user::User};
-use super::{button, centered_component, no_resize_child_window, no_resize_window, spacing, text_input, theme, use_font, NEXT_WINDOW_SPECS};
+use super::{button, centered_component, no_resize_child_window, no_resize_window, spacing, text_input, theme, use_font, BORDER_RADIUS, NEXT_WINDOW_SPECS};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
@@ -9,13 +9,21 @@ pub(crate) enum SidebarAction {
     FIND_NEW_FRIEND(String),
 }
 
+#[derive(Debug, Clone)]
+enum SidebarState {
+    FRIENDS,
+    CHATS
+}
+
 pub(crate) struct SidebarManager {
+    state: SidebarState,
     theme: Rc<theme::Theme>,
     friend_tag: String,
 }
 impl SidebarManager {
     pub(crate) fn new(theme: Rc<theme::Theme>) -> Self {
         Self { 
+            state: SidebarState::FRIENDS,
             theme, 
             friend_tag: String::default()
         }
@@ -28,6 +36,26 @@ impl SidebarManager {
         friends: &[User],
         mut func: impl FnMut(SidebarAction)
     ) {
+        let window_size = [200.0, ui.io().display_size[1]];
+
+        if let Some(action) = match self.state {
+            SidebarState::FRIENDS => self.show_friends_sidebar(renderer, friends, ui),
+            SidebarState::CHATS => todo!(),
+        } {
+            func(action);
+        }
+        
+        unsafe { NEXT_WINDOW_SPECS = ([window_size[0], 0.0], [ui.io().display_size[0] - window_size[0], ui.io().display_size[1]]) };
+    }
+}
+impl SidebarManager {
+    fn show_friends_sidebar(
+        &mut self, 
+        renderer: &Renderer, 
+        friends: &[User],
+        ui: &imgui::Ui
+    ) -> Option<SidebarAction>
+    {
         let window_size = [200.0, ui.io().display_size[1]];
 
         no_resize_window(
@@ -55,6 +83,7 @@ impl SidebarManager {
                     self.theme.accent_color, 
                 )) {
                    warn!("GOTO CHATS!");
+                   // TODO: self.state = SidebarState::CHATS;
                 }
                 
                 // Friends Search
@@ -65,20 +94,36 @@ impl SidebarManager {
                 spacing(ui, 1);
                 _fonts.push(use_font(ui, super::FontType::REGULAR17));
                 if self.show_friend_search(ui) {
-                    func(SidebarAction::FIND_NEW_FRIEND(self.friend_tag.clone()));
-                    self.friend_tag.clear();
+                    return Some(SidebarAction::FIND_NEW_FRIEND(std::mem::take(&mut self.friend_tag)));
                 }
                 
-                // Friend List
                 self.show_friend_list(ui, friends);
-            });
-        
-        unsafe { NEXT_WINDOW_SPECS = ([window_size[0], 0.0], [ui.io().display_size[0] - window_size[0], ui.io().display_size[1]]) };
+                
+                spacing(ui, 1);
+                _fonts.push(use_font(ui, super::FontType::BOLD17));
+                if self.show_friend_requests_btn(ui) {
+                    warn!("GOTO FIREND_REQUESTS");
+                }
+
+                None
+            })
+            .unwrap_or(None)
     }
-}
-impl SidebarManager {
+
+    fn show_friend_requests_btn(&self, ui: &imgui::Ui) -> bool {
+        button(
+            ui, 
+            "Friend Requests", 
+            [ui.content_region_avail()[0], 40.0], 
+            BORDER_RADIUS, 
+            self.theme.accent_color, 
+            self.theme.main_bg_color,
+            self.theme.main_bg_color,
+        )
+    }
+
     fn show_friend_search(&mut self, ui: &imgui::Ui) -> bool {
-        let _window_rounding = ui.push_style_var(imgui::StyleVar::ChildRounding(5.0));
+        let _window_rounding = ui.push_style_var(imgui::StyleVar::ChildRounding(BORDER_RADIUS));
         no_resize_child_window(
             ui, 
             "friend_search", 
@@ -111,7 +156,7 @@ impl SidebarManager {
                     "##friends_search", 
                     self.theme.input_text_bg_light, 
                     [0.0, 0.0, 0.0, 1.0],
-                    3.0, 
+                    BORDER_RADIUS, 
                     imgui::InputTextFlags::CALLBACK_RESIZE
                     | imgui::InputTextFlags::ENTER_RETURNS_TRUE
                 )
@@ -130,10 +175,9 @@ impl SidebarManager {
             None, 
             [ui.content_region_avail()[0], ui.content_region_avail()[1] - 120.0], 
             [0.0, 0.0], 
-            [0.0, 0.0, 0.0, 1.0],
-            // self.theme.left_panel_bg_color, 
+            self.theme.left_panel_bg_color, 
             |ui| {
-                let _window_rounding = ui.push_style_var(imgui::StyleVar::ChildRounding(5.0));
+                let _window_rounding = ui.push_style_var(imgui::StyleVar::ChildRounding(BORDER_RADIUS));
                 for (i, friend) in friends
                     .iter()
                     .enumerate() 

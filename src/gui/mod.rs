@@ -6,7 +6,7 @@ pub(crate) mod validation_gui;
 pub(crate) mod sidebar_gui;
 pub(crate) mod friends_page_gui;
 
-const BORDER_RADIUS: f32 = 3.0;
+const BORDER_RADIUS: f32 = 5.0;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum FontType {
@@ -100,8 +100,10 @@ pub(crate) fn init_gui(renderer: &mut Renderer, window: &LgWindow) -> Result<(),
 fn window<F, R>(
     ui: &imgui::Ui,
     title: &str,
+    flags: Option<imgui::WindowFlags>,
     position: [f32; 2],
     size: [f32; 2],
+    padding: [f32; 2],
     min_size: [f32; 2],
     bg_color: [f32; 4],
     func: F,
@@ -112,15 +114,15 @@ where
     let _window_bg = ui.push_style_color(imgui::StyleColor::WindowBg, bg_color);
     let _window_border = ui.push_style_var(imgui::StyleVar::WindowBorderSize(0.0));
     let _window_min_size = ui.push_style_var(imgui::StyleVar::WindowMinSize(min_size));
-    let _window_padding = ui.push_style_var(imgui::StyleVar::WindowPadding([0.0; 2]));
+    let _window_padding = ui.push_style_var(imgui::StyleVar::WindowPadding(padding));
 
     ui.window(title)
         .position(position, imgui::Condition::Always)
         .size(size, imgui::Condition::Always)
         .flags(imgui::WindowFlags::NO_TITLE_BAR
-            | imgui::WindowFlags::NO_SCROLLBAR
-            | imgui::WindowFlags::NO_SCROLL_WITH_MOUSE
             | imgui::WindowFlags::NO_MOVE
+            | imgui::WindowFlags::NO_RESIZE
+            | flags.unwrap_or(imgui::WindowFlags::empty())
         )
         .build(|| func(&ui))
 }
