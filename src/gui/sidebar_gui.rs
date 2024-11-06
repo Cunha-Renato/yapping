@@ -33,13 +33,13 @@ impl SidebarManager {
         &mut self, 
         ui: &imgui::Ui, 
         renderer: &Renderer, 
-        friends: &[User],
+        user: &User,
         mut func: impl FnMut(SidebarAction)
     ) {
         let window_size = [200.0, ui.io().display_size[1]];
 
         if let Some(action) = match self.state {
-            SidebarState::FRIENDS => self.show_friends_sidebar(renderer, friends, ui),
+            SidebarState::FRIENDS => self.show_friends_sidebar(renderer, user, ui),
             SidebarState::CHATS => todo!(),
         } {
             func(action);
@@ -52,7 +52,7 @@ impl SidebarManager {
     fn show_friends_sidebar(
         &mut self, 
         renderer: &Renderer, 
-        friends: &[User],
+        user: &User,
         ui: &imgui::Ui
     ) -> Option<SidebarAction>
     {
@@ -97,13 +97,61 @@ impl SidebarManager {
                     return Some(SidebarAction::FIND_NEW_FRIEND(std::mem::take(&mut self.friend_tag)));
                 }
                 
-                self.show_friend_list(ui, friends);
+                self.show_friend_list(ui, user.friends());
                 
                 spacing(ui, 1);
                 _fonts.push(use_font(ui, super::FontType::BOLD17));
                 if self.show_friend_requests_btn(ui) {
                     warn!("GOTO FIREND_REQUESTS");
                 }
+
+                // User
+                spacing(ui, 5);
+                _fonts.pop();
+                let _padding = ui.push_style_var(imgui::StyleVar::CellPadding([5.0, 0.0]));
+                let _table = ui.begin_table("##user_sidebar", 3);
+                let region_avail = ui.content_region_avail()[0];
+                ui.table_setup_column_with(imgui::TableColumnSetup { 
+                    name: "##user_pic_column1", 
+                    flags: imgui::TableColumnFlags::WIDTH_FIXED, 
+                    init_width_or_weight: region_avail / 3.0 - 10.0, 
+                    ..Default::default()
+                });
+                ui.table_setup_column_with(imgui::TableColumnSetup { 
+                    name: "##user_pic_column2", 
+                    flags: imgui::TableColumnFlags::WIDTH_FIXED, 
+                    init_width_or_weight: region_avail / 2.0 - 10.0,
+                    ..Default::default()
+                });
+                ui.table_setup_column("##sidebar_config_btn");
+                  
+
+                ui.table_next_row();
+                ui.table_next_column();
+                button(
+                    ui, 
+                    "##user_pic_sidebar", 
+                    ui.content_region_avail(), 
+                    BORDER_RADIUS, 
+                    self.theme.positive_btn_color, 
+                    self.theme.positive_actv_btn_color, 
+                    self.theme.positive_actv_btn_color, 
+                );
+
+                ui.table_next_column();
+                ui.text(user.tag());
+                ui.text(std::format!("{:?}", user.state()));
+
+                ui.table_next_column();
+                button(
+                    ui, 
+                    "##config_sidebar", 
+                    ui.content_region_avail(), 
+                    BORDER_RADIUS, 
+                    self.theme.positive_btn_color, 
+                    self.theme.positive_actv_btn_color, 
+                    self.theme.positive_actv_btn_color, 
+                );                
 
                 None
             })
@@ -191,6 +239,15 @@ impl SidebarManager {
                         [0.0, 0.0], 
                         self.theme.accent_color, 
                         |ui| {
+                            if ui.is_window_hovered() && ui.is_mouse_clicked(imgui::MouseButton::Right) {
+                                ui.open_popup("##sidebar_friend_popup");
+                            }
+                            
+                            if let Some(_popup) = ui.begin_popup("##sidebar_friend_popup") {
+                                ui.text("Hello");
+                                ui.text("World");                                    
+                            }
+
                             button(
                                 ui, 
                                 &std::format!("##friend_pic_{}", i), 

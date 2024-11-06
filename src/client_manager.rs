@@ -102,6 +102,8 @@ impl ClientManager {
                         ui.text(std::format!("uuid: {}", user.uuid().to_string()));
                         ui.text(std::format!("tag: {}", user.tag()));
                         ui.text(std::format!("profile_pic: {:?}", user.profile_pic()));
+                        ui.text(std::format!("notifications: {:#?}", user.notifications()));
+                        ui.text("friends: ");
                         for friend in user.friends() {
                             ui.tree_node_config(friend.tag())
                                 .framed(true)
@@ -182,7 +184,7 @@ impl ClientManager {
             self.gui_managers.sidebar.on_imgui(
                 ui, 
                 renderer, 
-                user.friends(),
+                user,
                 |action| {
                     if let Err(e) = match action {
                         SidebarAction::FIND_NEW_FRIEND(friend_tag) => {

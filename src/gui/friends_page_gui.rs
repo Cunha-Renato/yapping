@@ -53,7 +53,6 @@ impl FriendsPageManager {
             |ui| {
                 // Table setup.
                 let _padding = ui.push_style_var(imgui::StyleVar::CellPadding([0.0, 0.0]));
-
                 let _table = ui.begin_table_with_flags(
                     std::format!("##pic_table_friends_page_{}", friend.uuid().to_string()), 
                     2, 
