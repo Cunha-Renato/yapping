@@ -32,8 +32,12 @@ impl ServerCommunication {
         self.connected
     }
 
-    pub(crate) fn get_messages(&mut self) -> Vec<(ServerMessageContent, Response)> {
+    pub(crate) fn sent_responded(&mut self) -> Vec<(ServerMessage, Response)> {
         self.manager.sent_responded()
+    }
+    
+    pub(crate) fn received(&mut self) -> Vec<ServerMessage> {
+        self.manager.received_waiting()
     }
     
     pub(crate) fn on_update(&mut self) -> Result<(), StdError> {

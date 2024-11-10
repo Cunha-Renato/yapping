@@ -1,18 +1,20 @@
 use std::rc::Rc;
-use yapping_core::{client_server_coms::{Notification, Query, Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, AsLgTime, Rfc, StdError, UUID}, user::{User, UserCreationInfo}};
-use crate::{gui::{friends_page_gui::FriendsPageManager, show_loading_gui, sidebar_gui::{SidebarAction, SidebarManager}, theme::Theme, validation_gui::validation_gui_manager::{ValidationAction, ValidationGuiManager}}, server_coms::ServerCommunication};
+use yapping_core::{client_server_coms::{Modification, Notification, Query, Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, AsLgTime, Rfc, StdError, UUID}, user::User};
+use crate::{gui::{friends_notifications_gui::FriendsNotificationsManager, friends_page_gui::FriendsPageManager, show_loading_gui, sidebar_gui::{SidebarAction, SidebarManager}, theme::Theme, validation_gui::validation_gui_manager::{ValidationAction, ValidationGuiManager}}, server_coms::ServerCommunication};
 
 struct GUIManagers {
     validation: ValidationGuiManager,
     sidebar: SidebarManager,
-    friend_page: FriendsPageManager,
+    friends_notification: FriendsNotificationsManager,
+    friends_page: FriendsPageManager,
 }
 impl GUIManagers {
     fn new(theme: Rc<Theme>) -> Self {
         Self {
             validation: ValidationGuiManager::new(Rc::clone(&theme)),
             sidebar: SidebarManager::new(Rc::clone(&theme)),
-            friend_page: FriendsPageManager::new(theme),
+            friends_notification: FriendsNotificationsManager::new(Rc::clone(&theme)),
+            friends_page: FriendsPageManager::new(theme),
         }
     }
 }
@@ -23,6 +25,7 @@ pub(crate) enum ForegroundState {
     MAIN_PAGE,
     VALIDATION,
     CHAT_PAGE,
+    FRIENDS_NOTIFICATIONS,
     FRIENDS_PAGE,
 }
 
@@ -53,26 +56,45 @@ impl ClientManager {
         Ok(())
     }
 
-    pub(crate) fn on_server_message(&mut self, messages: Vec<(ServerMessageContent, Response)>) -> Result<(), StdError> {
+    pub(crate) fn on_responded_messages(&mut self, messages: Vec<(ServerMessage, Response)>) -> Result<(), StdError> {
         for (msg, response) in messages {
-            match (msg, response) {
-                (ServerMessageContent::NOTIFICATION(_), Response::OK_NOTIFICATION(notification)) => if let Some(user) = &mut self.current_user {
-                    // TODO: I don't know how to do this.
-                    user.add_notification(notification);
-                },
-                (ServerMessageContent::MODIFICATION(_), Response::OK_MODIFICATION(_)) => todo!(),
-                (ServerMessageContent::QUERY(_), Response::OK_QUERY(Query::RESULT(result))) => if let Some(user) = &self.current_user {
-                    let friends = result.into_iter()
-                        .filter(|u| u.uuid() != user.uuid())
-                        .collect();
-                    
-                    self.gui_managers.friend_page.set_friends(friends);
-                },
+            info!("Responded: {:#?}", response);
+
+            match (msg.content, response) {
+                (ServerMessageContent::NOTIFICATION(_), Response::OK_NOTIFICATION(notification)) => self.handle_notification(msg.uuid, notification),
+                (ServerMessageContent::MODIFICATION(_), Response::OK_MODIFICATION(modification)) => self.handle_modification(msg.uuid, modification),
+                (ServerMessageContent::QUERY(_), Response::OK_QUERY(query)) => self.handle_query(msg.uuid, query),
+                (_, Response::OK) => (),
                 (_, Response::Err(e)) => error!("{e}"),
                 _ => error!("Unexpected message from Server!"),
             }
         }
         
+        Ok(())
+    }
+
+    pub(crate) fn on_received(&mut self, messages: Vec<ServerMessage>) -> Result<(), StdError> {
+        for msg in messages {
+            info!("Received: {:#?}", msg);
+
+            match msg.content {
+                ServerMessageContent::NOTIFICATION(notification) => {
+                    match notification {
+                        Notification::MESSAGE(_, _) => todo!(),
+                        Notification::MESSAGE_READ(_) => todo!(),
+                        Notification::NEW_CHAT(_) => todo!(),
+                        Notification::FRIEND_REQUEST(sender, _) => {
+                            self.gui_managers.friends_notification.add_notification(sender);
+                        },
+                        Notification::FRIEND_ACCEPTED(_, _) => todo!(),
+                    };
+
+                    self.server_coms.borrow_mut().send(ServerMessage::new(msg.uuid, ServerMessageContent::RESPONSE(Response::OK)))?;
+                }
+                _ => (),
+            }
+        }
+
         Ok(())
     }
 
@@ -87,6 +109,7 @@ impl ClientManager {
             ForegroundState::VALIDATION => self.on_validation(ui, renderer),
             ForegroundState::CHAT_PAGE => todo!(),
             ForegroundState::FRIENDS_PAGE => self.on_friends_page(ui, renderer),
+            ForegroundState::FRIENDS_NOTIFICATIONS => self.on_friends_notifications(ui, renderer),
         } 
     }
     
@@ -134,7 +157,7 @@ impl ClientManager {
                     
                     ui.tree_node_config("FriendsPage")
                         .framed(true)
-                        .build(|| ui.text(std::format!("{:#?}", self.gui_managers.friend_page)));
+                        .build(|| ui.text(std::format!("{:#?}", self.gui_managers.friends_page)));
                 });
             });
     }
@@ -146,6 +169,30 @@ impl ClientManager {
     }
 }
 impl ClientManager {
+    fn handle_notification(&mut self, msg_uuid: UUID, notification: Notification) {
+        if let Some(user) = &mut self.current_user {
+            // TODO: I don't know how to do this.
+            user.add_notification(notification);
+        }
+    }
+
+    fn handle_modification(&mut self, msg_uuid: UUID, modification: Modification) {
+        todo!()
+    }
+    
+    fn handle_query(&mut self, msg_uuid: UUID, query: Query) {
+        match query {
+            Query::RESULT(result) => if let Some(user) = &self.current_user {
+                let friends = result.into_iter()
+                    .filter(|u| u.uuid() != user.uuid())
+                    .collect();
+                
+                self.gui_managers.friends_page.set_friends(friends);
+            }
+            _ => (),
+        }
+    }
+
     fn on_validation(&mut self, ui: &mut imgui::Ui, renderer: &Renderer) {
         self.gui_managers.validation.on_imgui(ui, renderer, |v_action, info| {
             match match v_action {
@@ -193,6 +240,11 @@ impl ClientManager {
                             self.server_coms.borrow_mut().send(ServerMessage::from(ServerMessageContent::QUERY(Query::USERS_CONTAINS_TAG(friend_tag))))
                         },
                         SidebarAction::CONFIG => todo!(),
+                        SidebarAction::NOTIFICATIONS => {
+                            self.foreground_state = ForegroundState::FRIENDS_NOTIFICATIONS;
+
+                            Ok(())
+                        },
                     } {
                         error!("During Sidebar::on_imgui! {}", e);
                     };
@@ -200,12 +252,23 @@ impl ClientManager {
         }
     }
     
+    fn on_friends_notifications(&mut self, ui: &mut imgui::Ui, renderer: &Renderer) {
+        self.on_sidebar(ui, renderer);
+        
+        let friends_notification = &mut self.gui_managers.friends_notification;
+        if friends_notification.needs_querey() {
+            // TODO!
+        };
+        friends_notification.on_imgui(ui, renderer);
+    }
+
     fn on_friends_page(&mut self, ui: &mut imgui::Ui, renderer: &Renderer) {
         self.on_sidebar(ui, renderer);
 
-        self.gui_managers.friend_page.on_imgui(
-            ui, 
-            renderer
-        );
+        if let (Some(user_uuid), Some(current_user)) = (self.gui_managers.friends_page.on_imgui(ui, renderer), &self.current_user) {
+            if let Err(e) = self.server_coms.borrow_mut().send(ServerMessage::from(ServerMessageContent::NOTIFICATION(Notification::FRIEND_REQUEST(current_user.uuid(), user_uuid)))) {
+                error!("In ClientManager::on_friends_page: {e}");
+            }
+        }
     }
 }

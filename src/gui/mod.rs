@@ -4,6 +4,7 @@ use yapping_core::l3gion_rust::{imgui, lg_core::{renderer::{texture::{TextureFil
 pub(crate) mod theme;
 pub(crate) mod validation_gui;
 pub(crate) mod sidebar_gui;
+pub(crate) mod friends_notifications_gui;
 pub(crate) mod friends_page_gui;
 
 const BORDER_RADIUS: f32 = 5.0;

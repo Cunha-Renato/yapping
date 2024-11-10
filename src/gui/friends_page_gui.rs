@@ -1,7 +1,7 @@
 use std::{fmt::Debug, rc::Rc};
-use yapping_core::{l3gion_rust::{imgui, lg_core::renderer::Renderer}, user::User};
+use yapping_core::{l3gion_rust::{imgui, lg_core::renderer::Renderer, UUID}, user::User};
 
-use super::{button, no_resize_child_window, no_resize_window, theme, window, NEXT_WINDOW_SPECS};
+use super::{button, no_resize_child_window, no_resize_window, theme, window, BORDER_RADIUS, NEXT_WINDOW_SPECS};
 
 pub(crate) struct FriendsPageManager {
     theme: Rc<theme::Theme>,
@@ -19,10 +19,10 @@ impl FriendsPageManager {
         self.friends_to_display = users;
     }
     
-    pub(crate) fn on_imgui(&mut self, ui: &imgui::Ui, renderer: &Renderer) {
+    pub(crate) fn on_imgui(&mut self, ui: &imgui::Ui, renderer: &Renderer) -> Option<UUID> {
         let (window_pos, window_size) = unsafe { NEXT_WINDOW_SPECS };
 
-        window(
+        let result = window(
             ui, 
             "test", 
             None,
@@ -34,15 +34,22 @@ impl FriendsPageManager {
             |ui| {
                 for friend in &self.friends_to_display {
                     let _window_rounding = ui.push_style_var(imgui::StyleVar::ChildRounding(3.0));
-                    self.friend_cell(friend, ui);
+                    if self.friend_cell(friend, ui) {
+                        return Some(friend.uuid());
+                    }
                 }
-            });
+                
+                None
+            })
+            .unwrap_or(None);
         
         unsafe { NEXT_WINDOW_SPECS = ([0.0; 2], [0.0; 2]); }
+
+        result
     }
 }
 impl FriendsPageManager {
-    fn friend_cell(&self, friend: &User, ui: &imgui::Ui) {
+    fn friend_cell(&self, friend: &User, ui: &imgui::Ui) -> bool {
         no_resize_child_window(
             ui, 
             &std::format!("##child_window_{}", friend.uuid().to_string()),
@@ -75,7 +82,29 @@ impl FriendsPageManager {
 
                 ui.text(friend.tag());
                 ui.text(std::format!("{:?}", friend.state()));
-            });
+                
+                if ui.is_window_hovered() && ui.is_mouse_clicked(imgui::MouseButton::Right) {
+                    ui.open_popup("##sidebar_friend_popup");
+                }
+                
+                if let Some(_popup) = ui.begin_popup("##sidebar_friend_popup") {
+                    // TODO: 
+                    if button(
+                        ui, 
+                        "Add Friend", 
+                        [30.0, 15.0], 
+                        BORDER_RADIUS, 
+                        self.theme.accent_color, 
+                        self.theme.main_bg_color, 
+                        self.theme.main_bg_color, 
+                    ) {
+                        return true;
+                    }
+                }
+                
+                false
+            })
+            .unwrap_or(false)
     }
 }
 impl Debug for FriendsPageManager {

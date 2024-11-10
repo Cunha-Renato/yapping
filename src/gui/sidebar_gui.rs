@@ -7,6 +7,7 @@ use super::{button, centered_component, no_resize_child_window, no_resize_window
 #[derive(Debug, Clone)]
 pub(crate) enum SidebarAction {
     FIND_NEW_FRIEND(String),
+    NOTIFICATIONS,
     CONFIG,
 }
 
@@ -94,8 +95,7 @@ impl SidebarManager {
         spacing(ui, 1);
         _fonts.push(use_font(ui, super::FontType::BOLD17));
         if self.show_friend_requests_btn(ui) {
-            warn!("GOTO FIREND_REQUESTS");
-            // TODO!
+            return Some(SidebarAction::NOTIFICATIONS);
         }
 
         // User
