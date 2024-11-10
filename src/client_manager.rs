@@ -56,19 +56,20 @@ impl ClientManager {
     pub(crate) fn on_server_message(&mut self, messages: Vec<(ServerMessageContent, Response)>) -> Result<(), StdError> {
         for (msg, response) in messages {
             match (msg, response) {
-                (ServerMessageContent::NOTIFICATION(_), Response::OK_NOTIFICATION(_)) => todo!(),
+                (ServerMessageContent::NOTIFICATION(_), Response::OK_NOTIFICATION(notification)) => if let Some(user) = &mut self.current_user {
+                    // TODO: I don't know how to do this.
+                    user.add_notification(notification);
+                },
                 (ServerMessageContent::MODIFICATION(_), Response::OK_MODIFICATION(_)) => todo!(),
-                (ServerMessageContent::QUERY(_), Response::OK_QUERY(Query::RESULT(result))) => {
-                    if let Some(user) = &self.current_user {
-                        let friends = result.into_iter()
-                            .filter(|u| u.uuid() != user.uuid())
-                            .collect();
-                        
-                        self.gui_managers.friend_page.set_friends(friends);
-                    }
+                (ServerMessageContent::QUERY(_), Response::OK_QUERY(Query::RESULT(result))) => if let Some(user) = &self.current_user {
+                    let friends = result.into_iter()
+                        .filter(|u| u.uuid() != user.uuid())
+                        .collect();
+                    
+                    self.gui_managers.friend_page.set_friends(friends);
                 },
                 (_, Response::Err(e)) => error!("{e}"),
-                _ => (),
+                _ => error!("Unexpected message from Server!"),
             }
         }
         
@@ -191,6 +192,7 @@ impl ClientManager {
                             self.foreground_state = ForegroundState::FRIENDS_PAGE;
                             self.server_coms.borrow_mut().send(ServerMessage::from(ServerMessageContent::QUERY(Query::USERS_CONTAINS_TAG(friend_tag))))
                         },
+                        SidebarAction::CONFIG => todo!(),
                     } {
                         error!("During Sidebar::on_imgui! {}", e);
                     };
