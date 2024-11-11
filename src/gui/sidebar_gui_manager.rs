@@ -1,7 +1,6 @@
-use std::{fmt::Debug, rc::Rc};
-
-use yapping_core::{chat::Chat, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::warn}, user::User};
-use super::{button, centered_component, no_resize_child_window, no_resize_window, spacing, text_input, theme, use_font, BORDER_RADIUS, NEXT_WINDOW_SPECS};
+use yapping_core::{chat::Chat, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::warn, Rfc, StdError, UUID}, user::User};
+use crate::{client_manager::{AppState, ForegroundState}, server_coms::ServerCommunication};
+use super::{button, centered_component, gui_manager::GuiMannager, no_resize_child_window, no_resize_window, spacing, text_input, use_font, BORDER_RADIUS, NEXT_WINDOW_SPECS};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
@@ -17,28 +16,29 @@ enum SidebarState {
     CHATS
 }
 
-pub(crate) struct SidebarManager {
-    state: SidebarState,
-    theme: Rc<theme::Theme>,
+pub(crate) struct SidebarGuiManager {
+    app_state: AppState,
+    sidebar_state: SidebarState,
+    sidebar_action: Option<SidebarAction>,
     search_buffer: String,
 }
-impl SidebarManager {
-    pub(crate) fn new(theme: Rc<theme::Theme>) -> Self {
-        Self { 
-            state: SidebarState::FRIENDS,
-            theme, 
+impl SidebarGuiManager {
+    pub(crate) fn new(app_state: AppState) -> Self {
+        Self {
+            app_state,
+            sidebar_state: SidebarState::FRIENDS,
+            sidebar_action: None,
             search_buffer: String::default(),
         }
     }
+}
 
-    pub(crate) fn on_imgui(
-        &mut self, 
-        ui: &imgui::Ui, 
-        renderer: &Renderer, 
-        user: &User,
-        mut func: impl FnMut(SidebarAction)
-    ) {
+impl GuiMannager for SidebarGuiManager {
+    fn on_imgui(&mut self, ui: &imgui::Ui, renderer: &Renderer) {
         let window_size = [200.0, ui.io().display_size[1]];
+
+        let app_state_clone = Rfc::clone(&self.app_state.shared_mut);
+        let app_state_borrow = app_state_clone.borrow();
 
         no_resize_window(
             ui, 
@@ -48,25 +48,40 @@ impl SidebarManager {
             window_size, 
             [window_size[0] * 0.05, 5.0],
             window_size, 
-            self.theme.left_panel_bg_color, 
-            |ui| {        
-                if let Some(action) = match self.state {
-                    SidebarState::FRIENDS => self.show_friends_sidebar(renderer, user, ui),
-                    SidebarState::CHATS => self.show_chats_sidebar(renderer, user, ui),
+            self.app_state.theme.left_panel_bg_color, 
+            |ui| {
+                let user = if let Some(user) = &app_state_borrow.user { user }
+                else { return; };
+
+                if let Some(action) = match self.sidebar_state {
+                    SidebarState::FRIENDS => self.show_friends_sidebar(ui, renderer, user),
+                    SidebarState::CHATS => self.show_chats_sidebar(ui, renderer, user),
                 } {
-                    func(action);
+                    self.sidebar_action = Some(action);
                 }
             });
         
         unsafe { NEXT_WINDOW_SPECS = ([window_size[0], 0.0], [ui.io().display_size[0] - window_size[0], ui.io().display_size[1]]) };
     }
+
+    fn on_update(&mut self, _server_coms: &mut ServerCommunication) -> Result<(), StdError> {
+        if let Some(action) = self.sidebar_action.take() {
+            self.app_state.shared_mut.borrow_mut().foreground_state = match action {
+                SidebarAction::FIND_NEW_FRIEND(mut user_tag) => ForegroundState::FIND_USERS(std::mem::take(&mut user_tag)),
+                SidebarAction::NOTIFICATIONS => ForegroundState::FRIENDS_NOTIFICATIONS,
+                SidebarAction::CONFIG => todo!(),
+            }
+        }
+        
+        Ok(())
+    }
 }
-impl SidebarManager {
+impl SidebarGuiManager {
     fn show_friends_sidebar(
         &mut self, 
+        ui: &imgui::Ui, 
         renderer: &Renderer, 
-        user: &User,
-        ui: &imgui::Ui
+        user: &User
     ) -> Option<SidebarAction>
     {
         let mut _fonts = vec![use_font(ui, super::FontType::BOLD24)];
@@ -75,7 +90,7 @@ impl SidebarManager {
         size[1] = 50.0;
         
         if self.show_big_btn("Chats", ui) {
-           self.state = SidebarState::CHATS;
+           self.sidebar_state = SidebarState::CHATS;
         }
         
         // Friends Search
@@ -86,7 +101,6 @@ impl SidebarManager {
         spacing(ui, 1);
         _fonts.push(use_font(ui, super::FontType::REGULAR17));
         if self.show_search("User Tag", ui) {
-            println!("{}", self.search_buffer);
             return Some(SidebarAction::FIND_NEW_FRIEND(std::mem::take(&mut self.search_buffer)));
         }
         
@@ -105,9 +119,9 @@ impl SidebarManager {
 
     fn show_chats_sidebar(
         &mut self, 
+        ui: &imgui::Ui,
         renderer: &Renderer, 
         user: &User,
-        ui: &imgui::Ui
     ) -> Option<SidebarAction>
     {
         let mut _fonts = vec![use_font(ui, super::FontType::BOLD24)];
@@ -116,7 +130,7 @@ impl SidebarManager {
         size[1] = 50.0;
         
         if self.show_big_btn("Friends", ui) {
-           self.state = SidebarState::FRIENDS;
+           self.sidebar_state = SidebarState::FRIENDS;
         }
         
         // Friends Search
@@ -136,7 +150,7 @@ impl SidebarManager {
         spacing(ui, 7);
         self.show_user(user, ui)
     }
-    
+
     fn show_user(&self, user: &User, ui: &imgui::Ui) -> Option<SidebarAction> {
         let _font = use_font(ui, super::FontType::REGULAR17);
         let _padding = ui.push_style_var(imgui::StyleVar::CellPadding([5.0, 0.0]));
@@ -165,9 +179,9 @@ impl SidebarManager {
             "##user_pic_sidebar", 
             ui.content_region_avail(), 
             BORDER_RADIUS, 
-            self.theme.positive_btn_color, 
-            self.theme.positive_actv_btn_color, 
-            self.theme.positive_actv_btn_color, 
+            self.app_state.theme.positive_btn_color, 
+            self.app_state.theme.positive_actv_btn_color, 
+            self.app_state.theme.positive_actv_btn_color, 
         );
 
         ui.table_next_column();
@@ -180,9 +194,9 @@ impl SidebarManager {
             "##config_sidebar", 
             ui.content_region_avail(), 
             BORDER_RADIUS, 
-            self.theme.positive_btn_color, 
-            self.theme.positive_actv_btn_color, 
-            self.theme.positive_actv_btn_color, 
+            self.app_state.theme.positive_btn_color, 
+            self.app_state.theme.positive_actv_btn_color, 
+            self.app_state.theme.positive_actv_btn_color, 
         ) {
             return Some(SidebarAction::CONFIG);
         }
@@ -196,9 +210,9 @@ impl SidebarManager {
             "Friend Requests", 
             [ui.content_region_avail()[0], 40.0], 
             BORDER_RADIUS, 
-            self.theme.accent_color, 
-            self.theme.main_bg_color,
-            self.theme.main_bg_color,
+            self.app_state.theme.accent_color, 
+            self.app_state.theme.main_bg_color,
+            self.app_state.theme.main_bg_color,
         )
     }
 
@@ -211,9 +225,9 @@ impl SidebarManager {
             label, 
             c_size, 
             50.0, 
-            self.theme.accent_color, 
-            self.theme.main_bg_color, 
-            self.theme.accent_color, 
+            self.app_state.theme.accent_color, 
+            self.app_state.theme.main_bg_color, 
+            self.app_state.theme.accent_color, 
         ))
     }
 
@@ -225,16 +239,16 @@ impl SidebarManager {
             None,
             [ui.content_region_avail()[0], 33.0], 
             [2.0; 2], 
-            self.theme.accent_color, 
+            self.app_state.theme.accent_color, 
             |ui| {
                 if button(
                     ui, 
                     "+", 
                     [30.0, ui.content_region_avail()[1]], 
                     3.0, 
-                    self.theme.accent_color, 
-                    self.theme.main_bg_color, 
-                    self.theme.accent_color, 
+                    self.app_state.theme.accent_color, 
+                    self.app_state.theme.main_bg_color, 
+                    self.app_state.theme.accent_color, 
                 ) {
                     return true;
                 }
@@ -249,7 +263,7 @@ impl SidebarManager {
                     label,
                     &mut self.search_buffer, 
                     "##search", 
-                    self.theme.input_text_bg_light, 
+                    self.app_state.theme.input_text_bg_light, 
                     [0.0, 0.0, 0.0, 1.0],
                     BORDER_RADIUS, 
                     imgui::InputTextFlags::CALLBACK_RESIZE
@@ -270,7 +284,7 @@ impl SidebarManager {
             None, 
             [ui.content_region_avail()[0], ui.content_region_avail()[1] - 120.0], 
             [0.0, 0.0], 
-            self.theme.left_panel_bg_color, 
+            self.app_state.theme.left_panel_bg_color, 
             |ui| {
                 let _window_rounding = ui.push_style_var(imgui::StyleVar::ChildRounding(BORDER_RADIUS));
                 for (i, friend) in friends
@@ -284,7 +298,7 @@ impl SidebarManager {
                         None, 
                         [ui.content_region_avail()[0], 50.0], 
                         [0.0, 0.0], 
-                        self.theme.accent_color, 
+                        self.app_state.theme.accent_color, 
                         |ui| {
                             if ui.is_window_hovered() && ui.is_mouse_clicked(imgui::MouseButton::Right) {
                                 ui.open_popup("##sidebar_friend_popup");
@@ -297,9 +311,9 @@ impl SidebarManager {
                                     "Chat", 
                                     [30.0, 15.0], 
                                     BORDER_RADIUS, 
-                                    self.theme.accent_color, 
-                                    self.theme.main_bg_color, 
-                                    self.theme.main_bg_color, 
+                                    self.app_state.theme.accent_color, 
+                                    self.app_state.theme.main_bg_color, 
+                                    self.app_state.theme.main_bg_color, 
                                 ) {
                                     warn!("Begin Chat with: {}", friend.tag());
                                 }
@@ -310,9 +324,9 @@ impl SidebarManager {
                                 &std::format!("##friend_pic_{}", i), 
                                 [50.0, ui.content_region_avail()[1]], 
                                 0.0,
-                                self.theme.positive_btn_color, 
-                                self.theme.positive_btn_color, 
-                                self.theme.positive_btn_color, 
+                                self.app_state.theme.positive_btn_color, 
+                                self.app_state.theme.positive_btn_color, 
+                                self.app_state.theme.positive_btn_color, 
                             );
 
                             // TODO: Use tables here!
@@ -324,7 +338,7 @@ impl SidebarManager {
                 }
             });
     }
-    
+
     fn show_chat_list(&self, ui: &imgui::Ui, chats: &[Chat]) {
         spacing(ui, 5);
         ui.separator();
@@ -336,7 +350,7 @@ impl SidebarManager {
             None, 
             [ui.content_region_avail()[0], ui.content_region_avail()[1] - 120.0], 
             [0.0, 0.0], 
-            self.theme.left_panel_bg_color, 
+            self.app_state.theme.left_panel_bg_color, 
             |ui| {
                 let _window_rounding = ui.push_style_var(imgui::StyleVar::ChildRounding(BORDER_RADIUS));
                 for (i, friend) in chats
@@ -350,7 +364,7 @@ impl SidebarManager {
                         None, 
                         [ui.content_region_avail()[0], 50.0], 
                         [0.0, 0.0], 
-                        self.theme.accent_color, 
+                        self.app_state.theme.accent_color, 
                         |ui| {
                             if ui.is_window_hovered() && ui.is_mouse_clicked(imgui::MouseButton::Right) {
                                 ui.open_popup("##sidebar_chat_popup");
@@ -365,9 +379,9 @@ impl SidebarManager {
                                 &std::format!("##chat_pic{}", i), 
                                 [50.0, ui.content_region_avail()[1]], 
                                 0.0,
-                                self.theme.positive_btn_color, 
-                                self.theme.positive_btn_color, 
-                                self.theme.positive_btn_color, 
+                                self.app_state.theme.positive_btn_color, 
+                                self.app_state.theme.positive_btn_color, 
+                                self.app_state.theme.positive_btn_color, 
                             );
 
                             // TODO: Use tables here!
@@ -376,12 +390,5 @@ impl SidebarManager {
                         });
                 }
             });
-    }
-}
-impl Debug for SidebarManager {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SidebarManager")
-            .field("buffer", &self.search_buffer)
-            .finish()
     }
 }

@@ -3,9 +3,10 @@ use yapping_core::l3gion_rust::{imgui, lg_core::{renderer::{texture::{TextureFil
 
 pub(crate) mod theme;
 pub(crate) mod validation_gui;
-pub(crate) mod sidebar_gui;
 pub(crate) mod friends_notifications_gui;
-pub(crate) mod friends_page_gui;
+pub(crate) mod find_user_gui;
+pub(crate) mod gui_manager;
+pub(crate) mod sidebar_gui_manager;
 
 const BORDER_RADIUS: f32 = 5.0;
 

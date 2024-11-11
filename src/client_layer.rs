@@ -81,8 +81,9 @@ impl Layer for ClientLayer {
         let sent_responded = self.server_coms.borrow_mut().sent_responded();
         let received = self.server_coms.borrow_mut().received();
 
+        self.client_manager.on_update();
         self.client_manager.on_responded_messages(sent_responded)?;
-        self.client_manager.on_received(received)?;
+        self.client_manager.on_received_messages(received)?;
 
         Ok(())
     }
