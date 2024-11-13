@@ -6,6 +6,7 @@ use crate::{gui::{find_user_gui::FindUserGuiManager, friends_notifications_gui::
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ForegroundState {
     MAIN_PAGE,
+    TOKEN,
     VALIDATION,
     CHAT_PAGE,
     FRIENDS_NOTIFICATIONS,
@@ -93,6 +94,10 @@ impl ClientManager {
     }
 
     pub(crate) fn on_update(&mut self) {
+        if !self.server_coms.borrow().connected() {
+            // TODO: Query All of the information again
+        }
+
         for e in self.gui_managers.on_update(&mut self.server_coms.borrow_mut()) {
             if let Some(e) = e { error!("{e}"); }
         }
@@ -118,14 +123,6 @@ impl ClientManager {
 
             match msg.content {
                 ServerMessageContent::NOTIFICATION(notification) => {
-                    match notification {
-                        Notification::MESSAGE(_, _) => todo!(),
-                        Notification::MESSAGE_READ(_) => todo!(),
-                        Notification::NEW_CHAT(_) => todo!(),
-                        Notification::FRIEND_REQUEST(_, _) => (),
-                        Notification::FRIEND_ACCEPTED(_, _) => todo!(),
-                    };
-
                     self.server_coms.borrow_mut().send(ServerMessage::new(msg.uuid, ServerMessageContent::RESPONSE(Response::OK)))?;
                 }
                 _ => (),
@@ -142,11 +139,6 @@ impl ClientManager {
             return;
         }
 
-        match &mut self.app_state.shared_mut.borrow_mut().foreground_state {
-            ForegroundState::FIND_USERS(user_tag) => self.gui_managers.find_user.set_user_tag(std::mem::take(user_tag)),
-            _ => (),
-        };
-
         match &self.app_state.shared_mut.borrow().foreground_state {
             ForegroundState::MAIN_PAGE => {
                 self.gui_managers.sidebar.on_imgui(ui, renderer);
@@ -162,6 +154,7 @@ impl ClientManager {
                 self.gui_managers.sidebar.on_imgui(ui, renderer);
                 self.gui_managers.find_user.on_imgui(ui, renderer);
             },
+            _ => (),
         }
     }
     
@@ -178,7 +171,6 @@ impl ClientManager {
                         ui.text(std::format!("uuid: {}", user.uuid().to_string()));
                         ui.text(std::format!("tag: {}", user.tag()));
                         ui.text(std::format!("profile_pic: {:?}", user.profile_pic()));
-                        ui.text(std::format!("notifications: {:#?}", user.notifications()));
                         ui.text("friends: ");
                         for friend in user.friends() {
                             ui.tree_node_config(friend.tag())

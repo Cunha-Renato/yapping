@@ -1,4 +1,4 @@
-use yapping_core::{client_server_coms::{Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, Rfc, StdError, UUID}, user::UserCreationInfo};
+use yapping_core::{client_server_coms::{Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, AsLgTime, Rfc, StdError, UUID}, user::UserCreationInfo};
 
 use crate::{client_manager::{AppState, ForegroundState}, gui::{button, gui_manager::GuiMannager, no_resize_window, spacing, use_font, FontType}, server_coms::ServerCommunication};
 
@@ -49,44 +49,42 @@ impl GuiMannager for ValidationGuiManager {
         self.waiting_response = msg_uuid;
         let info = std::mem::take(&mut self.user_creation_info);
 
-        if let Err(e) = server_coms.send(ServerMessage::new(
+        match server_coms.send_and_wait(1.s(), ServerMessage::new(
             msg_uuid, 
             match self.validation_state {
                 ValidationState::LOGIN => ServerMessageContent::SESSION(Session::LOGIN(info)),
                 ValidationState::SIGN_UP => ServerMessageContent::SESSION(Session::SIGN_UP(info)),
             }))
         {
-            self.error_msg = e.to_string();
+            Ok(response) => if let Err(e) = self.handle_response(response) {
+                self.error_msg = e.to_string();
+            },
+            Err(e) => self.error_msg = e.to_string(),
         }
         
         self.user_action = false;
 
         Ok(())
     }
+}
 
-    fn on_responded_messages(&mut self, messages: &mut Vec<(ServerMessage, Response)>, _server_coms: &mut ServerCommunication) -> Result<(), StdError> {
-        if !self.is_valid() { return Ok(()); }
-
-        if let Some(i) = messages.iter_mut()
-            .position(|(m, _)| m.uuid == self.waiting_response) 
-        {
-            let (_, response) = messages.remove(i);
+impl ValidationGuiManager {
+    fn handle_response(&mut self, response: ServerMessageContent) -> Result<(), StdError> {
+        let response = if let ServerMessageContent::RESPONSE(response) = response { response }
+        else { return Err("In ValidationGuiManager::handle_response: Got wrong message from Server!".into()); };
             
-            match response {
-                Response::OK_SESSION(Session::TOKEN(user)) => {
-                    self.app_state.shared_mut.borrow_mut().user = Some(user);
-                    self.app_state.shared_mut.borrow_mut().foreground_state = ForegroundState::MAIN_PAGE;
-                },
-                Response::Err(e) => self.error_msg = e,
-                _ => self.error_msg = String::from("In ValidationGUI::on_responded_messages: Wrong response from Server!"),
-            }
+        match response {
+            Response::OK_SESSION(Session::TOKEN(user)) => {
+                self.app_state.shared_mut.borrow_mut().user = Some(user);
+                self.app_state.shared_mut.borrow_mut().foreground_state = ForegroundState::MAIN_PAGE;
+            },
+            Response::Err(e) => self.error_msg = e,
+            _ => self.error_msg = String::from("In ValidationGUI::on_responded_messages: Wrong response from Server!"),
         }
 
         Ok(())
     }
-}
 
-impl ValidationGuiManager {
     fn is_valid(&self) -> bool {
         self.app_state.shared_mut.borrow().foreground_state == ForegroundState::VALIDATION
     }

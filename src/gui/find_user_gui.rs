@@ -1,5 +1,5 @@
-use std::{borrow::Borrow, rc::Rc};
-use yapping_core::{client_server_coms::{Notification, Query, Response, ServerMessage, ServerMessageContent}, l3gion_rust::{imgui, lg_core::renderer::Renderer, Rfc, StdError, UUID}, user::User};
+use std::{borrow::{Borrow, BorrowMut}, rc::Rc};
+use yapping_core::{client_server_coms::{Notification, NotificationType, Query, Response, ServerMessage, ServerMessageContent}, l3gion_rust::{imgui, lg_core::renderer::Renderer, Rfc, StdError, UUID}, user::User};
 use crate::{client_manager::AppState, server_coms::ServerCommunication};
 use super::{button, gui_manager::GuiMannager, no_resize_child_window, window, BORDER_RADIUS, NEXT_WINDOW_SPECS};
 
@@ -18,12 +18,6 @@ impl FindUserGuiManager {
             user_tag_to_search: None,
             user_selected: None,
             waiting_response: UUID::default(),
-        }
-    }
-    
-    pub(crate) fn set_user_tag(&mut self, user_tag: String) {
-        if !user_tag.is_empty() { 
-            self.user_tag_to_search = Some(user_tag);
         }
     }
 }
@@ -54,6 +48,11 @@ impl GuiMannager for FindUserGuiManager {
     }
 
     fn on_update(&mut self, server_coms: &mut ServerCommunication) -> Result<(), StdError> {
+        match &mut self.app_state.shared_mut.borrow_mut().foreground_state {
+            crate::client_manager::ForegroundState::FIND_USERS(user_tag) => self.user_tag_to_search = Some(std::mem::take(user_tag)),
+            _ => (),
+        }
+
         // Finding the matching user tags.
         if let Some(user_tag_to_search) = self.user_tag_to_search.take() {
             if !user_tag_to_search.is_empty() {
@@ -65,9 +64,13 @@ impl GuiMannager for FindUserGuiManager {
         }
 
         // If User wants to send a friend request.
-        if let Some(user_uuid) = self.user_selected.take() {
-            if let Some(current_user) = &self.app_state.shared_mut.borrow().user {
-                server_coms.send(ServerMessage::new(UUID::generate(), ServerMessageContent::NOTIFICATION(Notification::FRIEND_REQUEST(current_user.uuid(), user_uuid))))?;
+        let shared_mut = self.app_state.shared_mut.borrow();
+        if let Some(current_user) = &shared_mut.user {
+            if let Some(user_uuid) = self.user_selected.take() {
+                server_coms.send(ServerMessage::new(UUID::generate(), ServerMessageContent::NOTIFICATION(Notification::new(NotificationType::FRIEND_REQUEST(
+                    current_user.uuid(), 
+                    user_uuid
+                )))))?;
             }
         }
         
@@ -82,6 +85,7 @@ impl GuiMannager for FindUserGuiManager {
             
             match response {
                 Response::OK_QUERY(Query::RESULT(users)) => {
+                    // Removing the current user from the list
                     self.users = users.into_iter()
                         .filter(|u| {
                             if let Some(user) = &self.app_state.shared_mut.borrow().user {

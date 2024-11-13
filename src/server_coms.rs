@@ -84,7 +84,7 @@ impl ServerCommunication {
     pub(crate) fn send_and_wait(&mut self, timeout: LgTime, message: ServerMessage) -> Result<ServerMessageContent, StdError> {
         self.send_to_server(&message)?;
 
-        let rx = self.message_rx.as_mut().ok_or("Client is not connected to the Server!")?;
+        let rx = self.message_rx.as_mut().ok_or("In ServerCommunication::send_and_wait: Client is not connected to the Server!")?;
 
         let timer = LgTimer::new();
         while timer.elapsed() < timeout {
@@ -97,7 +97,11 @@ impl ServerCommunication {
             }
         }
         
-        Err("Response was not received!".into())
+        Err("In ServerCommunication::send_and_wait: Timeout!".into())
+    }
+    
+    pub(crate) fn wait_for_response(&mut self, msg_uuid: UUID) {
+        while self.manager.was_responded(msg_uuid) != true {}
     }
 }
 // Private
