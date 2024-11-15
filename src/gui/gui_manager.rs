@@ -9,11 +9,11 @@ pub(crate) trait GuiMannager {
     /// Change State
     fn on_update(&mut self, server_coms: &mut ServerCommunication) -> Result<(), StdError>;
     
-    fn on_responded_messages(&mut self, messages: &mut Vec<(ServerMessage, Response)>, server_coms: &mut ServerCommunication) -> Result<(), StdError> {
-        Ok(())
+    fn on_responded_messages(&mut self, message: &(ServerMessage, Response), server_coms: &mut ServerCommunication) -> Result<bool, StdError> {
+        Ok(false)
     }
     
-    fn on_received_messages(&mut self, messages: &mut Vec<ServerMessage>, server_coms: &mut ServerCommunication) -> Result<(), StdError> {
+    fn on_received_messages(&mut self, messages: &ServerMessage) -> Result<(), StdError> {
         Ok(())
     }
 }

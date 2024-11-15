@@ -77,16 +77,14 @@ impl GuiMannager for FindUserGuiManager {
         Ok(())
     }
     
-    fn on_responded_messages(&mut self, messages: &mut Vec<(ServerMessage, Response)>, _server_coms: &mut ServerCommunication) -> Result<(), StdError> {
-        if let Some(i) = messages.iter_mut()
-            .position(|(m, _)| m.uuid == self.waiting_response) 
+    fn on_responded_messages(&mut self, message: &(ServerMessage, Response), _server_coms: &mut ServerCommunication) -> Result<bool, StdError> {
+        if message.0.uuid == self.waiting_response
         {
-            let (_, response) = messages.remove(i);
-            
-            match response {
-                Response::OK_QUERY(Query::RESULT(users)) => {
+            self.waiting_response = UUID::default();
+            match &message.1 {
+                Response::OK_QUERY(Query::RESULT_USER(users)) => {
                     // Removing the current user from the list
-                    self.users = users.into_iter()
+                    self.users = users.clone().into_iter()
                         .filter(|u| {
                             if let Some(user) = &self.app_state.shared_mut.borrow().user {
                                 return user.uuid() != u.uuid();
@@ -96,12 +94,13 @@ impl GuiMannager for FindUserGuiManager {
                         })
                         .collect();
                 },
-                Response::Err(e) => return Err(e.into()),
+                Response::Err(e) => return Err(e.clone().into()),
                 _ => return Err(String::from("In FindUserGuiManager::on_responded_messages: Wrong response from Server!").into()),
             }
+            
+            Ok(true)
         }
-        
-        Ok(())
+        else { Ok(false) }
     }
 }
 impl FindUserGuiManager {

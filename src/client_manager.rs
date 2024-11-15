@@ -1,6 +1,6 @@
 use std::rc::Rc;
-use yapping_core::{client_server_coms::{Modification, Notification, Query, Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, AsLgTime, Rfc, StdError, UUID}, user::User};
-use crate::{gui::{find_user_gui::FindUserGuiManager, friends_notifications_gui::FriendsNotificationsManager, gui_manager::GuiMannager, show_loading_gui, sidebar_gui_manager::SidebarGuiManager, theme::Theme, validation_gui::validation_gui_manager::ValidationGuiManager}, server_coms::ServerCommunication};
+use yapping_core::{client_server_coms::{Modification, Notification, NotificationType, Query, Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, AsLgTime, Rfc, StdError, UUID}, serde::de::IntoDeserializer, user::User};
+use crate::{gui::{find_user_gui::FindUserGuiManager, friends_notifications_gui::FriendsNotificationsGuiManager, gui_manager::GuiMannager, show_loading_gui, sidebar_gui_manager::SidebarGuiManager, theme::Theme, validation_gui::validation_gui_manager::ValidationGuiManager}, server_coms::{self, ServerCommunication}};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq)]
@@ -27,6 +27,7 @@ struct GuiManagers {
     validation: ValidationGuiManager,
     sidebar: SidebarGuiManager,
     find_user: FindUserGuiManager,
+    friends_notifications: FriendsNotificationsGuiManager,
 }
 impl GuiManagers {
     fn new(app_state: AppState) -> Self {
@@ -34,30 +35,44 @@ impl GuiManagers {
             validation: ValidationGuiManager::new(app_state.clone()),
             sidebar: SidebarGuiManager::new(app_state.clone()),
             find_user: FindUserGuiManager::new(app_state.clone()),
+            friends_notifications: FriendsNotificationsGuiManager::new(app_state.clone()),
         }
     }
 
-    fn on_update(&mut self, server_coms: &mut ServerCommunication) -> Vec<Option<StdError>> {
-        vec![
-            self.validation.on_update(server_coms).err(),
-            self.sidebar.on_update(server_coms).err(),
-            self.find_user.on_update(server_coms).err(),
-        ]
-    }
+    fn on_responded_messages(&mut self, messages: &[(ServerMessage, Response)], server_coms: &mut ServerCommunication) -> Vec<StdError> {
+        let mut errors = Vec::with_capacity(messages.len());
 
-    fn on_responded_messages(&mut self, messages: &mut Vec<(ServerMessage, Response)>, server_coms: &mut ServerCommunication) -> Vec<Option<StdError>> {
-        vec![
-            self.validation.on_responded_messages(messages, server_coms).err(),
-            self.sidebar.on_responded_messages(messages, server_coms).err(),
-            self.find_user.on_responded_messages(messages, server_coms).err(),
-        ]
+        for m in messages {
+            if let Some(true) = self.validation.on_responded_messages(m, server_coms)
+                .map_err(|err| errors.push(err))
+                .ok() 
+            { continue; }
+
+            if let Some(true) = self.sidebar.on_responded_messages(m, server_coms)
+                .map_err(|err| errors.push(err))
+                .ok() 
+            { continue; }
+
+            if let Some(true) = self.find_user.on_responded_messages(m, server_coms)
+                .map_err(|err| errors.push(err))
+                .ok() 
+            { continue; }
+
+            if let Some(true) = self.friends_notifications.on_responded_messages(m, server_coms)
+                .map_err(|err| errors.push(err))
+                .ok() 
+            { continue; }
+        }
+        
+        errors
     }
     
-    fn on_received_messages(&mut self, messages: &mut Vec<ServerMessage>, server_coms: &mut ServerCommunication) -> Vec<Option<StdError>> {
+    fn on_received_messages(&mut self, message: &ServerMessage) -> Vec<Option<StdError>> {
         vec![
-            self.validation.on_received_messages(messages, server_coms).err(),
-            self.sidebar.on_received_messages(messages, server_coms).err(),
-            self.find_user.on_received_messages(messages, server_coms).err(),
+            self.validation.on_received_messages(&message).err(),
+            self.sidebar.on_received_messages(&message).err(),
+            self.find_user.on_received_messages(&message).err(),
+            self.friends_notifications.on_received_messages(&message).err(),
         ]
     }
 }
@@ -98,35 +113,50 @@ impl ClientManager {
             // TODO: Query All of the information again
         }
 
-        for e in self.gui_managers.on_update(&mut self.server_coms.borrow_mut()) {
-            if let Some(e) = e { error!("{e}"); }
+        let foreground = self.app_state.shared_mut.borrow().foreground_state.clone();
+        if let Err(e) = match foreground {
+            ForegroundState::MAIN_PAGE => Ok(()),
+            ForegroundState::TOKEN => todo!(),
+            ForegroundState::VALIDATION => self.gui_managers.validation.on_update(&mut self.server_coms.borrow_mut()),
+            ForegroundState::CHAT_PAGE => todo!(),
+            ForegroundState::FRIENDS_NOTIFICATIONS => self.gui_managers.friends_notifications.on_update(&mut self.server_coms.borrow_mut()),
+            ForegroundState::FIND_USERS(_) => self.gui_managers.find_user.on_update(&mut self.server_coms.borrow_mut()),
+        } {
+            error!("{e}");
+        }
+        
+        if let Err(e) = self.gui_managers.sidebar.on_update(&mut self.server_coms.borrow_mut()) {
+            error!("{e}");
         }
     }
 
-    pub(crate) fn on_responded_messages(&mut self, mut messages: Vec<(ServerMessage, Response)>) -> Result<(), StdError> {
+    pub(crate) fn on_responded_messages(&mut self, messages: Vec<(ServerMessage, Response)>) -> Result<(), StdError> {
         for (_, response) in &messages {
             info!("Received response: {:#?}", response);
         }
         
-        for e in self.gui_managers.on_responded_messages(&mut messages, &mut self.server_coms.borrow_mut()) {
-            if let Some(e) = e { error!("{e}"); }
+        for e in self.gui_managers.on_responded_messages(&messages, &mut self.server_coms.borrow_mut()) {
+            error!("{e}");
         }
 
         Ok(())
     }
 
     pub(crate) fn on_received_messages(&mut self, messages: Vec<ServerMessage>) -> Result<(), StdError> {
-        for msg in messages {
-            // TODO: GuiManagers::on_received_messages.
+        let mut server_coms = self.server_coms.borrow_mut();
 
+        for msg in messages {
             info!("Received message: {:#?}", msg);
+            self.gui_managers.on_received_messages(&msg);
 
             match msg.content {
-                ServerMessageContent::NOTIFICATION(notification) => {
-                    self.server_coms.borrow_mut().send(ServerMessage::new(msg.uuid, ServerMessageContent::RESPONSE(Response::OK)))?;
+                ServerMessageContent::SESSION(Session::TOKEN(user)) => {
+                    self.app_state.shared_mut.borrow_mut().user = Some(user.clone());
                 }
                 _ => (),
-            }
+            };
+
+            server_coms.send(ServerMessage::new(msg.uuid, ServerMessageContent::RESPONSE(Response::OK)))?;
         }
 
         Ok(())
@@ -149,6 +179,7 @@ impl ClientManager {
             },
             ForegroundState::FRIENDS_NOTIFICATIONS => {
                 self.gui_managers.sidebar.on_imgui(ui, renderer);
+                self.gui_managers.friends_notifications.on_imgui(ui, renderer);
             },
             ForegroundState::FIND_USERS(_) => {
                 self.gui_managers.sidebar.on_imgui(ui, renderer);
