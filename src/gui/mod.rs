@@ -6,7 +6,8 @@ pub(crate) mod validation_gui;
 pub(crate) mod friends_notifications_gui;
 pub(crate) mod find_user_gui;
 pub(crate) mod gui_manager;
-pub(crate) mod sidebar_gui_manager;
+pub(crate) mod sidebar_gui;
+pub(crate) mod chat_page_gui;
 
 const BORDER_RADIUS: f32 = 5.0;
 
@@ -243,6 +244,25 @@ fn text_input(
 
     ui.input_text(label, buffer)
         .hint(hint)
+        .flags(flags)
+        .build()
+}
+
+fn multiline_text_input(
+    ui: &imgui::Ui, 
+    size: [f32; 2],
+    buffer: &mut String, 
+    label: &str, 
+    bg_color: [f32; 4],
+    text_color: [f32; 4],
+    border_radius: f32,
+    flags: imgui::InputTextFlags
+) -> bool {
+    let _bg_color_token = ui.push_style_color(imgui::StyleColor::FrameBg, bg_color);
+    let _text_color_token = ui.push_style_color(imgui::StyleColor::Text, text_color);
+    let _frame_rounding = ui.push_style_var(imgui::StyleVar::FrameRounding(border_radius));
+
+    ui.input_text_multiline(label, buffer, size)
         .flags(flags)
         .build()
 }

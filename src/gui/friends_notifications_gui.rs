@@ -35,7 +35,7 @@ impl GuiMannager for FriendsNotificationsGuiManager {
 
         window(
             ui, 
-            "test", 
+            "friends_notifications_window", 
             None,
             window_pos,
             window_size, 
@@ -45,7 +45,6 @@ impl GuiMannager for FriendsNotificationsGuiManager {
             |ui| {
                 let _font = use_font(ui, super::FontType::REGULAR24);
 
-                // O(n²) FUCK
                 for (notification_uuid, user) in &self.user_requests {
                     if ui.button(user.tag()) {
                         self.notifications_accepted.push(*notification_uuid);

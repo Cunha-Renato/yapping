@@ -4,7 +4,7 @@ use std::sync::mpsc::Receiver;
 use websocket::{ClientBuilder, Message};
 use websocket::sync::{Reader, Writer};
 use yapping_core::l3gion_rust::lg_types::units_of_time::LgTime;
-use yapping_core::l3gion_rust::sllog::error;
+use yapping_core::l3gion_rust::sllog::{error, info, warn};
 use yapping_core::l3gion_rust::{AsLgTime, LgTimer, StdError, UUID};
 use yapping_core::client_server_coms::{ComsManager, Response, ServerMessage, ServerMessageContent};
 
@@ -75,6 +75,7 @@ impl ServerCommunication {
     }
 
     pub(crate) fn send(&mut self, message: ServerMessage) -> Result<(), StdError> {
+        warn!("Sent: {:?}", message);
         self.send_to_server(&message)?;
         self.manager.sent(message);
 
@@ -137,6 +138,7 @@ impl ServerCommunication {
                 Ok(msg) => match msg {
                     websocket::OwnedMessage::Binary(bin_msg) => {
                         let server_msg = yapping_core::bincode::deserialize::<ServerMessage>(&bin_msg).unwrap();
+                        info!("Received: {:?}", server_msg);
                         tx.send(server_msg).unwrap();
                     },
                     _ => continue,

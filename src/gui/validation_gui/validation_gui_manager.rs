@@ -1,4 +1,4 @@
-use yapping_core::{client_server_coms::{Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, AsLgTime, Rfc, StdError, UUID}, user::UserCreationInfo};
+use yapping_core::{client_server_coms::{Query, Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, AsLgTime, Rfc, StdError, UUID}, user::UserCreationInfo};
 
 use crate::{client_manager::{AppState, ForegroundState}, gui::{button, gui_manager::GuiMannager, no_resize_window, spacing, use_font, FontType}, server_coms::ServerCommunication};
 
@@ -61,6 +61,8 @@ impl GuiMannager for ValidationGuiManager {
             },
             Err(e) => self.error_msg = e.to_string(),
         }
+        
+        server_coms.send(ServerMessage::from(ServerMessageContent::QUERY(Query::USER_CHATS)))?;
         
         self.user_action = false;
 

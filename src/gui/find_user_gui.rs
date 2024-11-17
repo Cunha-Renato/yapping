@@ -1,5 +1,5 @@
-use std::{borrow::{Borrow, BorrowMut}, rc::Rc};
-use yapping_core::{client_server_coms::{Notification, NotificationType, Query, Response, ServerMessage, ServerMessageContent}, l3gion_rust::{imgui, lg_core::renderer::Renderer, Rfc, StdError, UUID}, user::User};
+use std:: rc::Rc;
+use yapping_core::{client_server_coms::{Notification, NotificationType, Query, Response, ServerMessage, ServerMessageContent}, l3gion_rust::{imgui, lg_core::renderer::Renderer, StdError, UUID}, user::User};
 use crate::{client_manager::AppState, server_coms::ServerCommunication};
 use super::{button, gui_manager::GuiMannager, no_resize_child_window, window, BORDER_RADIUS, NEXT_WINDOW_SPECS};
 

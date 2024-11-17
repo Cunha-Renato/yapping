@@ -1,11 +1,14 @@
-use yapping_core::{chat::Chat, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::warn, Rfc, StdError, UUID}, user::User};
-use crate::{client_manager::{AppState, ForegroundState}, server_coms::ServerCommunication};
+use std::collections::HashMap;
+
+use yapping_core::{chat::Chat, client_server_coms::{Notification, NotificationType, ServerMessage, ServerMessageContent}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::warn, Rfc, StdError, UUID}, user::User};
+use crate::{client_manager::{AppState, ForegroundState}, server_coms::{self, ServerCommunication}};
 use super::{button, centered_component, gui_manager::GuiMannager, no_resize_child_window, no_resize_window, spacing, text_input, use_font, BORDER_RADIUS, NEXT_WINDOW_SPECS};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
 pub(crate) enum SidebarAction {
     FIND_NEW_FRIEND(String),
+    CHAT_PAGE(UUID),
     NOTIFICATIONS,
     CONFIG,
 }
@@ -21,6 +24,7 @@ pub(crate) struct SidebarGuiManager {
     sidebar_state: SidebarState,
     sidebar_action: Option<SidebarAction>,
     search_buffer: String,
+    begin_chat: Option<UUID>,
 }
 impl SidebarGuiManager {
     pub(crate) fn new(app_state: AppState) -> Self {
@@ -29,6 +33,7 @@ impl SidebarGuiManager {
             sidebar_state: SidebarState::FRIENDS,
             sidebar_action: None,
             search_buffer: String::default(),
+            begin_chat: None,
         }
     }
 }
@@ -52,10 +57,11 @@ impl GuiMannager for SidebarGuiManager {
             |ui| {
                 let user = if let Some(user) = &app_state_borrow.user { user }
                 else { return; };
+                let chats = &app_state_borrow.chats;
 
                 if let Some(action) = match self.sidebar_state {
                     SidebarState::FRIENDS => self.show_friends_sidebar(ui, renderer, user),
-                    SidebarState::CHATS => self.show_chats_sidebar(ui, renderer, user),
+                    SidebarState::CHATS => self.show_chats_sidebar(ui, renderer, user, &chats),
                 } {
                     self.sidebar_action = Some(action);
                 }
@@ -64,13 +70,22 @@ impl GuiMannager for SidebarGuiManager {
         unsafe { NEXT_WINDOW_SPECS = ([window_size[0], 0.0], [ui.io().display_size[0] - window_size[0], ui.io().display_size[1]]) };
     }
 
-    fn on_update(&mut self, _server_coms: &mut ServerCommunication) -> Result<(), StdError> {
+    fn on_update(&mut self, server_coms: &mut ServerCommunication) -> Result<(), StdError> {
         if let Some(action) = self.sidebar_action.take() {
             self.app_state.shared_mut.borrow_mut().foreground_state = match action {
                 SidebarAction::FIND_NEW_FRIEND(mut user_tag) => ForegroundState::FIND_USERS(std::mem::take(&mut user_tag)),
                 SidebarAction::NOTIFICATIONS => ForegroundState::FRIENDS_NOTIFICATIONS,
+                SidebarAction::CHAT_PAGE(chat_uuid) => ForegroundState::CHAT_PAGE(chat_uuid),
                 SidebarAction::CONFIG => todo!(),
             }
+        }
+        
+        if let (Some(chat_with), Some(current_user)) = (std::mem::take(&mut self.begin_chat), &self.app_state.shared_mut.borrow().user) {
+            self.begin_chat = None;
+            server_coms.send(ServerMessage::from(ServerMessageContent::NOTIFICATION(Notification::new(NotificationType::NEW_CHAT(Chat::new(
+                "placeholder_chat_tag", 
+                vec![current_user.uuid(), chat_with]
+            ))))))?;
         }
         
         Ok(())
@@ -122,6 +137,7 @@ impl SidebarGuiManager {
         ui: &imgui::Ui,
         renderer: &Renderer, 
         user: &User,
+        chats: &HashMap<UUID, Chat>,
     ) -> Option<SidebarAction>
     {
         let mut _fonts = vec![use_font(ui, super::FontType::BOLD24)];
@@ -143,7 +159,7 @@ impl SidebarGuiManager {
         self.show_search("Chat Tag", ui);
         
         // TODO: Get the chats
-        self.show_chat_list(ui, &[]);
+        self.show_chat_list(ui, chats);
         
         // User
         ui.set_cursor_pos([ui.cursor_pos()[0], ui.cursor_pos()[1] + 40.0]);
@@ -273,7 +289,7 @@ impl SidebarGuiManager {
             .unwrap_or(false)
     }
 
-    fn show_friend_list(&self, ui: &imgui::Ui, friends: &[User]) {
+    fn show_friend_list(&mut self, ui: &imgui::Ui, friends: &[User]) {
         spacing(ui, 5);
         ui.separator();
         spacing(ui, 5);
@@ -305,7 +321,6 @@ impl SidebarGuiManager {
                             }
                             
                             if let Some(_popup) = ui.begin_popup("##sidebar_friend_popup") {
-                                // TODO: 
                                 if button(
                                     ui, 
                                     "Chat", 
@@ -315,7 +330,7 @@ impl SidebarGuiManager {
                                     self.app_state.theme.main_bg_color, 
                                     self.app_state.theme.main_bg_color, 
                                 ) {
-                                    warn!("Begin Chat with: {}", friend.tag());
+                                    self.begin_chat = Some(friend.uuid());
                                 }
                             }
 
@@ -339,7 +354,7 @@ impl SidebarGuiManager {
             });
     }
 
-    fn show_chat_list(&self, ui: &imgui::Ui, chats: &[Chat]) {
+    fn show_chat_list(&mut self, ui: &imgui::Ui, chats: &HashMap<UUID, Chat>) {
         spacing(ui, 5);
         ui.separator();
         spacing(ui, 5);
@@ -353,10 +368,10 @@ impl SidebarGuiManager {
             self.app_state.theme.left_panel_bg_color, 
             |ui| {
                 let _window_rounding = ui.push_style_var(imgui::StyleVar::ChildRounding(BORDER_RADIUS));
-                for (i, friend) in chats
+                for (i, (_, chat)) in chats
                     .iter()
                     .enumerate() 
-                    .filter(|(_, chat)| (chat).tag().to_lowercase().contains(&self.search_buffer.to_lowercase()))
+                    .filter(|(_, (_, chat))| (chat).tag().to_lowercase().contains(&self.search_buffer.to_lowercase()))
                 {
                     no_resize_child_window(
                         ui, 
@@ -374,7 +389,7 @@ impl SidebarGuiManager {
                                 // TODO: 
                             }
 
-                            button(
+                            if button(
                                 ui, 
                                 &std::format!("##chat_pic{}", i), 
                                 [50.0, ui.content_region_avail()[1]], 
@@ -382,11 +397,17 @@ impl SidebarGuiManager {
                                 self.app_state.theme.positive_btn_color, 
                                 self.app_state.theme.positive_btn_color, 
                                 self.app_state.theme.positive_btn_color, 
-                            );
+                            ) {
+                                self.sidebar_action = Some(SidebarAction::CHAT_PAGE(chat.uuid()));
+                            };
 
                             // TODO: Use tables here!
                             ui.same_line();
-                            ui.text(friend.tag());
+                            ui.text(chat.tag());
+                            
+                            if ui.is_window_hovered() && ui.is_mouse_clicked(imgui::MouseButton::Left) {
+                                self.sidebar_action = Some(SidebarAction::CHAT_PAGE(chat.uuid()));
+                            }
                         });
                 }
             });

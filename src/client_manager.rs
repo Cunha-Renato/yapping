@@ -1,6 +1,6 @@
-use std::rc::Rc;
-use yapping_core::{client_server_coms::{Modification, Notification, NotificationType, Query, Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, AsLgTime, Rfc, StdError, UUID}, serde::de::IntoDeserializer, user::User};
-use crate::{gui::{find_user_gui::FindUserGuiManager, friends_notifications_gui::FriendsNotificationsGuiManager, gui_manager::GuiMannager, show_loading_gui, sidebar_gui_manager::SidebarGuiManager, theme::Theme, validation_gui::validation_gui_manager::ValidationGuiManager}, server_coms::{self, ServerCommunication}};
+use std::{borrow::BorrowMut, collections::HashMap, rc::Rc};
+use yapping_core::{chat::Chat, client_server_coms::{DbNotificationType, Modification, Notification, NotificationType, Query, Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, Rfc, StdError, UUID}, serde::de::IntoDeserializer, user::User};
+use crate::{gui::{chat_page_gui::ChatGuiManager, find_user_gui::FindUserGuiManager, friends_notifications_gui::FriendsNotificationsGuiManager, gui_manager::GuiMannager, show_loading_gui, sidebar_gui::SidebarGuiManager, theme::Theme, validation_gui::validation_gui_manager::ValidationGuiManager}, server_coms::{self, ServerCommunication}};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq)]
@@ -8,7 +8,7 @@ pub(crate) enum ForegroundState {
     MAIN_PAGE,
     TOKEN,
     VALIDATION,
-    CHAT_PAGE,
+    CHAT_PAGE(UUID),
     FRIENDS_NOTIFICATIONS,
     FIND_USERS(String),
 }
@@ -20,6 +20,7 @@ pub(crate) struct AppState {
 }
 pub(crate) struct SharedMut {
     pub(crate) user: Option<User>,
+    pub(crate) chats: HashMap<UUID, Chat>,
     pub(crate) foreground_state: ForegroundState,
 }
 
@@ -28,6 +29,7 @@ struct GuiManagers {
     sidebar: SidebarGuiManager,
     find_user: FindUserGuiManager,
     friends_notifications: FriendsNotificationsGuiManager,
+    chat_page: ChatGuiManager,
 }
 impl GuiManagers {
     fn new(app_state: AppState) -> Self {
@@ -36,6 +38,7 @@ impl GuiManagers {
             sidebar: SidebarGuiManager::new(app_state.clone()),
             find_user: FindUserGuiManager::new(app_state.clone()),
             friends_notifications: FriendsNotificationsGuiManager::new(app_state.clone()),
+            chat_page: ChatGuiManager::new(app_state.clone()),
         }
     }
 
@@ -59,6 +62,11 @@ impl GuiManagers {
             { continue; }
 
             if let Some(true) = self.friends_notifications.on_responded_messages(m, server_coms)
+                .map_err(|err| errors.push(err))
+                .ok() 
+            { continue; }
+            
+            if let Some(true) = self.chat_page.on_responded_messages(m, server_coms)
                 .map_err(|err| errors.push(err))
                 .ok() 
             { continue; }
@@ -91,6 +99,7 @@ impl ClientManager {
         let app_state = AppState {
             shared_mut: Rfc::new(SharedMut {
                 user: None,
+                chats: HashMap::default(),
                 foreground_state: ForegroundState::VALIDATION,
             }),
             theme: Rc::clone(&theme),
@@ -115,12 +124,12 @@ impl ClientManager {
 
         let foreground = self.app_state.shared_mut.borrow().foreground_state.clone();
         if let Err(e) = match foreground {
-            ForegroundState::MAIN_PAGE => Ok(()),
             ForegroundState::TOKEN => todo!(),
             ForegroundState::VALIDATION => self.gui_managers.validation.on_update(&mut self.server_coms.borrow_mut()),
-            ForegroundState::CHAT_PAGE => todo!(),
             ForegroundState::FRIENDS_NOTIFICATIONS => self.gui_managers.friends_notifications.on_update(&mut self.server_coms.borrow_mut()),
             ForegroundState::FIND_USERS(_) => self.gui_managers.find_user.on_update(&mut self.server_coms.borrow_mut()),
+            ForegroundState::CHAT_PAGE(_) => self.gui_managers.chat_page.on_update(&mut self.server_coms.borrow_mut()),
+            _ => Ok(()),
         } {
             error!("{e}");
         }
@@ -130,11 +139,31 @@ impl ClientManager {
         }
     }
 
-    pub(crate) fn on_responded_messages(&mut self, messages: Vec<(ServerMessage, Response)>) -> Result<(), StdError> {
-        for (_, response) in &messages {
+    pub(crate) fn on_responded_messages(&mut self, mut messages: Vec<(ServerMessage, Response)>) -> Result<(), StdError> {
+        for (message, response) in &mut messages {
             info!("Received response: {:#?}", response);
+            match response {
+                Response::OK_QUERY(query) => match query {
+                    Query::RESULT_CHAT_MESSAGES(messages) => match message.content {
+                        ServerMessageContent::QUERY(Query::CHAT_MESSAGES(chat_uuid)) => if let Some(chat) = self.app_state.shared_mut.borrow_mut().chats.get_mut(&chat_uuid) {
+                            chat.clear_messages();
+                            chat.append_messages(messages);
+                        },
+                        _ => error!("In ClientManager::on_responded_messages: Wrong response from server!"),
+                    },
+                    Query::RESULT_CHATS(chats) =>  self.app_state.shared_mut.borrow_mut().chats = chats.clone()
+                        .into_iter()
+                        .map(|chat| (chat.uuid(), chat))
+                        .collect(),
+                    
+                    _ => (),
+                }
+
+                Response::Err(e) => error!("In ClientManager::on_responded_messages: {e}"),
+                _ => (),
+            }
         }
-        
+
         for e in self.gui_managers.on_responded_messages(&messages, &mut self.server_coms.borrow_mut()) {
             error!("{e}");
         }
@@ -146,13 +175,29 @@ impl ClientManager {
         let mut server_coms = self.server_coms.borrow_mut();
 
         for msg in messages {
-            info!("Received message: {:#?}", msg);
             self.gui_managers.on_received_messages(&msg);
 
             match msg.content {
                 ServerMessageContent::SESSION(Session::TOKEN(user)) => {
                     self.app_state.shared_mut.borrow_mut().user = Some(user.clone());
                 }
+                ServerMessageContent::NOTIFICATION(notification) => match notification.notification_type {
+                    NotificationType::NEW_MESSAGE(chat_uuid, message) => if self.app_state.shared_mut
+                        .borrow_mut()
+                        .chats
+                        .get_mut(&chat_uuid)
+                        .map(|chat| chat.push_message(message))
+                        .is_none()
+                    {
+                        error!("In ClientManager::on_received_messages: Got a NEW_MESSAGE for a Chat that does't exist on client side!");
+                    },
+
+                    NotificationType::NEW_CHAT(chat) => { let _ = self.app_state.shared_mut.borrow_mut().chats.insert(chat.uuid(), chat); },
+                    NotificationType::FRIEND_REQUEST(_, _) => todo!(),
+                    NotificationType::FRIEND_ACCEPTED(_, _) => todo!(),
+                    NotificationType::MESSAGE_READ(_) => panic!("In ClientManager::on_received_messages: Received MESSAGE_READ(), this shoudn't happen!"),
+                    NotificationType::MESSAGE(_) => panic!("In ClientManager::on_received_messages: Received MESSAGE(), this shoudn't happen!"),
+                },
                 _ => (),
             };
 
@@ -174,8 +219,9 @@ impl ClientManager {
                 self.gui_managers.sidebar.on_imgui(ui, renderer);
             },
             ForegroundState::VALIDATION => self.gui_managers.validation.on_imgui(ui, renderer),
-            ForegroundState::CHAT_PAGE => {
+            ForegroundState::CHAT_PAGE(_) => {
                 self.gui_managers.sidebar.on_imgui(ui, renderer);
+                self.gui_managers.chat_page.on_imgui(ui, renderer);
             },
             ForegroundState::FRIENDS_NOTIFICATIONS => {
                 self.gui_managers.sidebar.on_imgui(ui, renderer);
@@ -212,7 +258,6 @@ impl ClientManager {
                                     ui.text(std::format!("profile_pic: {:?}", friend.profile_pic()));
                                 });
                         }
-                        ui.text(std::format!("chats: {:#?}", user.chats()));
                     });
                 
                 ui.tree_node_config("Theme")
