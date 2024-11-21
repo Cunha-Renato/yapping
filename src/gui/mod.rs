@@ -17,6 +17,7 @@ pub(crate) enum FontType {
     REGULAR24,
     BOLD17,
     BOLD24,
+    BOLD15,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -25,6 +26,7 @@ struct Fonts {
     regular_24: imgui::FontId,
     bold_17: imgui::FontId,
     bold_24: imgui::FontId,
+    bold_15: imgui::FontId,
 }
 
 static LOGO_PATH: &str = "assets/textures/logo.png";
@@ -83,6 +85,14 @@ pub(crate) fn init_gui(renderer: &mut Renderer, window: &LgWindow) -> Result<(),
                 config: None 
             }
         ),
+        (
+            String::from("Roboto-Bold15"),
+            imgui::FontSource::TtfData { 
+                data: include_bytes!("../../resources/fonts/roboto/Roboto-Bold.ttf"),
+                size_pixels: 15.0,
+                config: None 
+            }
+        ),
     ]);
 
     renderer.set_fonts();
@@ -93,6 +103,7 @@ pub(crate) fn init_gui(renderer: &mut Renderer, window: &LgWindow) -> Result<(),
         regular_24: imgui_core.get_font_id("Roboto-Regular24").unwrap(),
         bold_17: imgui_core.get_font_id("Roboto-Bold17").unwrap(),
         bold_24: imgui_core.get_font_id("Roboto-Bold24").unwrap(),
+        bold_15: imgui_core.get_font_id("Roboto-Bold15").unwrap(),
     };
 
     FONTS.with(|fonts_cell| fonts_cell.set(fonts).unwrap());
@@ -130,10 +141,36 @@ where
         .build(|| func(&ui))
 }
 
+fn child_window<F, R>(
+    ui: &imgui::Ui,
+    title: &str,
+    flags: imgui::WindowFlags,
+    size: [f32; 2],
+    padding: [f32; 2],
+    bg_color: [f32; 4],
+    func: F,
+) -> Option<R>
+where
+    F: FnOnce(&imgui::Ui) -> R
+{
+    let _window_bg = ui.push_style_color(imgui::StyleColor::ChildBg, bg_color);
+    let _window_padding = ui.push_style_var(imgui::StyleVar::WindowPadding(padding));
+
+    ui.child_window(title)
+        .size(size)
+        .flags(imgui::WindowFlags::NO_TITLE_BAR
+            | imgui::WindowFlags::ALWAYS_AUTO_RESIZE
+            | imgui::WindowFlags::NO_MOVE
+            | imgui::WindowFlags::ALWAYS_USE_WINDOW_PADDING
+            | flags
+        )
+        .build(|| func(&ui))
+}
+
 fn no_resize_child_window<F, R>(
     ui: &imgui::Ui,
     title: &str,
-    flags: Option<imgui::WindowFlags>,
+    flags: imgui::WindowFlags,
     size: [f32; 2],
     padding: [f32; 2],
     bg_color: [f32; 4],
@@ -151,7 +188,7 @@ where
             | imgui::WindowFlags::NO_RESIZE
             | imgui::WindowFlags::NO_MOVE
             | imgui::WindowFlags::ALWAYS_USE_WINDOW_PADDING
-            | flags.unwrap_or(imgui::WindowFlags::empty())
+            | flags
         )
         .build(|| func(&ui))
 }
@@ -222,6 +259,7 @@ pub(crate) fn use_font(ui: &imgui::Ui, font_type: FontType) -> imgui::FontStackT
             FontType::REGULAR24 => font.regular_24,
             FontType::BOLD17 => font.bold_17,
             FontType::BOLD24 => font.bold_24,
+            FontType::BOLD15 => font.bold_15,
         };
         
         ui.push_font(to_use)

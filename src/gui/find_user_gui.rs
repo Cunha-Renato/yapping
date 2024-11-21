@@ -110,7 +110,7 @@ impl FindUserGuiManager {
         no_resize_child_window(
             ui, 
             &std::format!("##child_window_{}", friend.uuid().to_string()),
-            None, 
+            imgui::WindowFlags::empty(), 
             [ui.content_region_avail()[0], 50.0], 
             [0.0; 2], 
             theme.accent_color, 

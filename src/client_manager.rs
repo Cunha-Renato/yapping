@@ -151,11 +151,15 @@ impl ClientManager {
                         },
                         _ => error!("In ClientManager::on_responded_messages: Wrong response from server!"),
                     },
-                    Query::RESULT_CHATS(chats) =>  self.app_state.shared_mut.borrow_mut().chats = chats.clone()
-                        .into_iter()
-                        .map(|chat| (chat.uuid(), chat))
-                        .collect(),
-                    
+                    Query::RESULT_CHATS(chats) => {
+                        let current_chats = &mut self.app_state.shared_mut.borrow_mut().chats;
+                        current_chats.clear();
+
+                        *current_chats = chats.clone()
+                            .into_iter()
+                            .map(|chat| (chat.uuid(), chat))
+                            .collect();
+                    },
                     _ => (),
                 }
 
@@ -180,6 +184,7 @@ impl ClientManager {
             match msg.content {
                 ServerMessageContent::SESSION(Session::TOKEN(user)) => {
                     self.app_state.shared_mut.borrow_mut().user = Some(user.clone());
+                    server_coms.send(ServerMessage::from(ServerMessageContent::QUERY(Query::USER_CHATS)))?;
                 }
                 ServerMessageContent::NOTIFICATION(notification) => match notification.notification_type {
                     NotificationType::NEW_MESSAGE(chat_uuid, message) => if self.app_state.shared_mut
@@ -193,10 +198,9 @@ impl ClientManager {
                     },
 
                     NotificationType::NEW_CHAT(chat) => { let _ = self.app_state.shared_mut.borrow_mut().chats.insert(chat.uuid(), chat); },
-                    NotificationType::FRIEND_REQUEST(_, _) => todo!(),
-                    NotificationType::FRIEND_ACCEPTED(_, _) => todo!(),
                     NotificationType::MESSAGE_READ(_) => panic!("In ClientManager::on_received_messages: Received MESSAGE_READ(), this shoudn't happen!"),
                     NotificationType::MESSAGE(_) => panic!("In ClientManager::on_received_messages: Received MESSAGE(), this shoudn't happen!"),
+                    _ => ()
                 },
                 _ => (),
             };

@@ -252,7 +252,7 @@ impl SidebarGuiManager {
         no_resize_child_window(
             ui, 
             "##search_child_window", 
-            None,
+            imgui::WindowFlags::empty(),
             [ui.content_region_avail()[0], 33.0], 
             [2.0; 2], 
             self.app_state.theme.accent_color, 
@@ -297,7 +297,7 @@ impl SidebarGuiManager {
         no_resize_child_window(
             ui, 
             "friend_list", 
-            None, 
+            imgui::WindowFlags::empty(), 
             [ui.content_region_avail()[0], ui.content_region_avail()[1] - 120.0], 
             [0.0, 0.0], 
             self.app_state.theme.left_panel_bg_color, 
@@ -311,7 +311,7 @@ impl SidebarGuiManager {
                     no_resize_child_window(
                         ui, 
                         &std::format!("friend_{}", i), 
-                        None, 
+                        imgui::WindowFlags::empty(), 
                         [ui.content_region_avail()[0], 50.0], 
                         [0.0, 0.0], 
                         self.app_state.theme.accent_color, 
@@ -362,7 +362,7 @@ impl SidebarGuiManager {
         no_resize_child_window(
             ui, 
             "chats_list", 
-            None, 
+            imgui::WindowFlags::empty(), 
             [ui.content_region_avail()[0], ui.content_region_avail()[1] - 120.0], 
             [0.0, 0.0], 
             self.app_state.theme.left_panel_bg_color, 
@@ -376,7 +376,7 @@ impl SidebarGuiManager {
                     no_resize_child_window(
                         ui, 
                         &std::format!("friend_{}", i), 
-                        None, 
+                        imgui::WindowFlags::empty(), 
                         [ui.content_region_avail()[0], 50.0], 
                         [0.0, 0.0], 
                         self.app_state.theme.accent_color, 

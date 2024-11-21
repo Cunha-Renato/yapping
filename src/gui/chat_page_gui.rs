@@ -1,8 +1,8 @@
-use yapping_core::{chrono, client_server_coms::{Notification, NotificationType, ServerMessage, ServerMessageContent}, date_time::DateTime, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, warn}, StdError, UUID}, message::{Message, MessageType}};
+use yapping_core::{chat::Chat, chrono::{self, Datelike, Timelike}, client_server_coms::{Notification, NotificationType, ServerMessage, ServerMessageContent}, date_time::DateTime, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, warn}, StdError, UUID}, message::{Message, MessageType}, user::User};
 
 use crate::{client_manager::{AppState, ForegroundState}, server_coms::ServerCommunication};
 
-use super::{gui_manager::GuiMannager, multiline_text_input, text_input, use_font, window, BORDER_RADIUS, NEXT_WINDOW_SPECS};
+use super::{button, gui_manager::GuiMannager, multiline_text_input, no_resize_child_window, spacing, text_input, use_font, window, BORDER_RADIUS, NEXT_WINDOW_SPECS};
 
 pub(crate) struct ChatGuiManager {
     app_state: AppState,
@@ -73,23 +73,14 @@ impl ChatGuiManager {
             window_size, 
             self.app_state.theme.main_bg_color,
             |ui| {
-                let _font = use_font(ui, super::FontType::REGULAR17);
-
-                for message in chat.messages() {
-                    if let Some(user) = &shared.borrow().user {
-                        if let Some(sender) = user.friends().iter().find(|f| f.uuid() == message.sender()) {
-                            ui.text(sender.tag());
-                        }
-                        else { ui.text("Unknown User"); }
-                    }
-                    else { error!("In ChatGuiManager::on_imgui: There is no user logged in!"); }
-
-                    match message.content() {
-                        MessageType::TEXT(text) => ui.text(text),
-                        MessageType::FILE(_) => todo!(),
-                    }
+                if let Some(user) = &shared.borrow().user {
+                    self.show_chat_messages(ui, renderer, user, chat);
                 }
 
+                let should_focus_keyboard = ui.is_window_hovered() || ui.is_item_hovered();
+
+                let _font = use_font(ui, super::FontType::REGULAR24);
+                ui.set_cursor_pos([ui.cursor_pos()[0], ui.cursor_pos()[1] + 35.0]);
                 self.send_message = multiline_text_input(
                     ui, 
                     [ui.content_region_avail()[0], 60.0],
@@ -103,10 +94,72 @@ impl ChatGuiManager {
                     | imgui::InputTextFlags::CTRL_ENTER_FOR_NEW_LINE
                     | imgui::InputTextFlags::ENTER_RETURNS_TRUE
                 );
-                // ui.set_keyboard_focus_here_with_offset(imgui::FocusedWidget::Previous);
+                if should_focus_keyboard || ui.is_item_hovered() {
+                    ui.set_keyboard_focus_here_with_offset(imgui::FocusedWidget::Previous);
+                }
                 ui.set_item_default_focus();
             });
         
         unsafe { NEXT_WINDOW_SPECS = ([0.0; 2], [0.0; 2]); }
+    }
+    
+    fn show_chat_messages(
+        &self, 
+        ui: &imgui::Ui,
+        renderer: &Renderer,
+        current_user: &User,
+        chat: &Chat,
+    ) {
+        no_resize_child_window(
+            ui, 
+            "chat_messages", 
+            imgui::WindowFlags::empty(), 
+            [ui.content_region_avail()[0], ui.content_region_avail()[1] - 100.0], 
+            [0.0; 2], 
+            self.app_state.theme.main_bg_color, 
+            |ui| {
+                for (i, message) in chat.messages().iter().enumerate() {
+                    let mut _fonts = vec![use_font(ui, super::FontType::BOLD24)];
+                    button(
+                        ui, 
+                        &std::format!("##user_pic_{i}"), 
+                        [30.0, 30.0], 
+                        BORDER_RADIUS, 
+                        self.app_state.theme.positive_btn_color, 
+                        self.app_state.theme.positive_btn_color, 
+                        self.app_state.theme.positive_btn_color, 
+                    );
+                    
+                    ui.same_line();
+                    let cursor_pos_message = ui.cursor_pos()[0];
+                    let cursor_pos_date_time = ui.cursor_pos()[1] + 9.0;
+                    if let Some(sender) = current_user.friends()
+                        .iter()
+                        .find(|u| u.uuid() == message.sender())
+                        .map(|u| u.tag())
+                        .or_else(|| {
+                            if current_user.uuid() == message.sender() { Some(current_user.tag()) }
+                            else { Some("Unknown User") }
+                        })
+                    { ui.text(sender); }
+                    
+                    if let Ok(date_time) = message.date_time().to_local() {
+                        _fonts.push(use_font(ui, super::FontType::BOLD15));
+                        ui.same_line();
+                        ui.set_cursor_pos([ui.cursor_pos()[0], cursor_pos_date_time]);
+
+                        ui.text_colored([1.0, 1.0, 1.0, 0.5], std::format!("{}/{}/{} {}:{}", date_time.day(), date_time.month(), date_time.year(), date_time.hour(), date_time.minute()));
+                    }
+                    
+                    _fonts.push(use_font(ui, super::FontType::REGULAR24));
+                    ui.set_cursor_pos([cursor_pos_message, ui.cursor_pos()[1]]);
+                    match message.content() {
+                        MessageType::TEXT(text) => ui.text(text),
+                        MessageType::FILE(_) => todo!(),
+                    }
+                    
+                    spacing(ui, 5);
+                }
+            });
     }
 }
