@@ -1,12 +1,12 @@
 use std::{borrow::BorrowMut, collections::HashMap, rc::Rc};
 use yapping_core::{chat::Chat, client_server_coms::{DbNotificationType, Modification, Notification, NotificationType, Query, Response, ServerMessage, ServerMessageContent, Session}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::{error, info}, Rfc, StdError, UUID}, serde::de::IntoDeserializer, user::User};
-use crate::{gui::{chat_page_gui::ChatGuiManager, find_user_gui::FindUserGuiManager, friends_notifications_gui::FriendsNotificationsGuiManager, gui_manager::GuiMannager, show_loading_gui, sidebar_gui::SidebarGuiManager, theme::Theme, validation_gui::validation_gui_manager::ValidationGuiManager}, server_coms::{self, ServerCommunication}};
+use crate::{gui::{chat_page_gui::ChatGuiManager, config_overlay_gui::ConfigOverlayGuiManager, find_user_gui::FindUserGuiManager, friends_notifications_gui::FriendsNotificationsGuiManager, gui_manager::GuiMannager, show_loading_gui, sidebar_gui::SidebarGuiManager, theme::Theme, validation_gui::validation_gui_manager::ValidationGuiManager}, server_coms::{self, ServerCommunication}};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ForegroundState {
     MAIN_PAGE,
-    TOKEN,
+    // TOKEN,
     VALIDATION,
     CHAT_PAGE(UUID),
     FRIENDS_NOTIFICATIONS,
@@ -22,6 +22,7 @@ pub(crate) struct SharedMut {
     pub(crate) user: Option<User>,
     pub(crate) chats: HashMap<UUID, Chat>,
     pub(crate) foreground_state: ForegroundState,
+    pub(crate) config: bool,
 }
 
 struct GuiManagers {
@@ -30,6 +31,7 @@ struct GuiManagers {
     find_user: FindUserGuiManager,
     friends_notifications: FriendsNotificationsGuiManager,
     chat_page: ChatGuiManager,
+    config_overlay: ConfigOverlayGuiManager,
 }
 impl GuiManagers {
     fn new(app_state: AppState) -> Self {
@@ -39,6 +41,7 @@ impl GuiManagers {
             find_user: FindUserGuiManager::new(app_state.clone()),
             friends_notifications: FriendsNotificationsGuiManager::new(app_state.clone()),
             chat_page: ChatGuiManager::new(app_state.clone()),
+            config_overlay: ConfigOverlayGuiManager::new(app_state.clone()),
         }
     }
 
@@ -70,6 +73,11 @@ impl GuiManagers {
                 .map_err(|err| errors.push(err))
                 .ok() 
             { continue; }
+            
+            if let Some(true) = self.config_overlay.on_responded_messages(m, server_coms)
+                .map_err(|err| errors.push(err))
+                .ok() 
+            { continue; }
         }
         
         errors
@@ -81,6 +89,7 @@ impl GuiManagers {
             self.sidebar.on_received_messages(&message).err(),
             self.find_user.on_received_messages(&message).err(),
             self.friends_notifications.on_received_messages(&message).err(),
+            self.config_overlay.on_received_messages(&message).err(),
         ]
     }
 }
@@ -101,6 +110,7 @@ impl ClientManager {
                 user: None,
                 chats: HashMap::default(),
                 foreground_state: ForegroundState::VALIDATION,
+                config: false,
             }),
             theme: Rc::clone(&theme),
         };
@@ -124,7 +134,6 @@ impl ClientManager {
 
         let foreground = self.app_state.shared_mut.borrow().foreground_state.clone();
         if let Err(e) = match foreground {
-            ForegroundState::TOKEN => todo!(),
             ForegroundState::VALIDATION => self.gui_managers.validation.on_update(&mut self.server_coms.borrow_mut()),
             ForegroundState::FRIENDS_NOTIFICATIONS => self.gui_managers.friends_notifications.on_update(&mut self.server_coms.borrow_mut()),
             ForegroundState::FIND_USERS(_) => self.gui_managers.find_user.on_update(&mut self.server_coms.borrow_mut()),
@@ -235,8 +244,17 @@ impl ClientManager {
                 self.gui_managers.sidebar.on_imgui(ui, renderer);
                 self.gui_managers.find_user.on_imgui(ui, renderer);
             },
-            _ => (),
         }
+
+        {
+            let shared_mut = &mut self.app_state.shared_mut.borrow_mut();
+            if shared_mut.config {
+                self.gui_managers.config_overlay.show();
+                shared_mut.config = false;
+            }
+        }
+
+        self.gui_managers.config_overlay.on_imgui(ui, renderer);
     }
     
     pub(crate) fn show_debug_gui(&self, ui: &imgui::Ui) {

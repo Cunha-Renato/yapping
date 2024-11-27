@@ -99,8 +99,6 @@ impl ChatGuiManager {
                 }
                 ui.set_item_default_focus();
             });
-        
-        unsafe { NEXT_WINDOW_SPECS = ([0.0; 2], [0.0; 2]); }
     }
     
     fn show_chat_messages(

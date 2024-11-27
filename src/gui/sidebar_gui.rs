@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::BorrowMut, collections::HashMap};
 
 use yapping_core::{chat::Chat, client_server_coms::{Notification, NotificationType, ServerMessage, ServerMessageContent}, l3gion_rust::{imgui, lg_core::renderer::Renderer, sllog::warn, Rfc, StdError, UUID}, user::User};
 use crate::{client_manager::{AppState, ForegroundState}, server_coms::{self, ServerCommunication}};
@@ -76,7 +76,10 @@ impl GuiMannager for SidebarGuiManager {
                 SidebarAction::FIND_NEW_FRIEND(mut user_tag) => ForegroundState::FIND_USERS(std::mem::take(&mut user_tag)),
                 SidebarAction::NOTIFICATIONS => ForegroundState::FRIENDS_NOTIFICATIONS,
                 SidebarAction::CHAT_PAGE(chat_uuid) => ForegroundState::CHAT_PAGE(chat_uuid),
-                SidebarAction::CONFIG => todo!(),
+                SidebarAction::CONFIG => {
+                    self.app_state.shared_mut.borrow_mut().config = true;
+                    self.app_state.shared_mut.borrow().foreground_state.clone()
+                },
             }
         }
         
@@ -122,7 +125,7 @@ impl SidebarGuiManager {
         self.show_friend_list(ui, user.friends());
         
         spacing(ui, 1);
-        _fonts.push(use_font(ui, super::FontType::BOLD17));
+        _fonts.push(use_font(ui, super::FontType::BOLD24));
         if self.show_friend_requests_btn(ui) {
             return Some(SidebarAction::NOTIFICATIONS);
         }

@@ -52,8 +52,6 @@ impl GuiMannager for FriendsNotificationsGuiManager {
                 }
                 
             });
-        
-        unsafe { NEXT_WINDOW_SPECS = ([0.0; 2], [0.0; 2]); }
     }
 
     fn on_update(&mut self, server_coms: &mut ServerCommunication) -> Result<(), StdError> {

@@ -8,6 +8,7 @@ pub(crate) mod find_user_gui;
 pub(crate) mod gui_manager;
 pub(crate) mod sidebar_gui;
 pub(crate) mod chat_page_gui;
+pub(crate) mod config_overlay_gui;
 
 const BORDER_RADIUS: f32 = 5.0;
 
@@ -73,7 +74,7 @@ pub(crate) fn init_gui(renderer: &mut Renderer, window: &LgWindow) -> Result<(),
             String::from("Roboto-Bold17"),
             imgui::FontSource::TtfData { 
                 data: include_bytes!("../../resources/fonts/roboto/Roboto-Bold.ttf"),
-                size_pixels: 24.0,
+                size_pixels: 17.0,
                 config: None 
             }
         ),
