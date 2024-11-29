@@ -1,13 +1,13 @@
-use yapping_core::{l3gion_rust::{imgui, lg_core::renderer::Renderer, lg_types::units_of_time::LgTime, AsLgTime, LgTimer, StdError}, user::User};
+use yapping_core::l3gion_rust::{imgui::{self, TableColumnSetup}, lg_core::renderer::Renderer, sllog::info, AsLgTime, LgTimer, StdError};
 use crate::{client_manager::AppState, server_coms::ServerCommunication};
-use super::{button, gui_manager::GuiMannager, no_resize_window, spacing, use_font, window, BORDER_RADIUS, NEXT_WINDOW_SPECS};
+use super::{button, gui_manager::GuiMannager, no_resize_window, spacing, text_input, use_font, BORDER_RADIUS, NEXT_WINDOW_SPECS};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ConfigState {
     MAIN,
     CHANGE_PIC,
-    CHANGE_NAME,
+    CHANGE_TAG,
 }
 
 pub(crate) struct ConfigOverlayGuiManager {
@@ -78,17 +78,11 @@ impl GuiMannager for ConfigOverlayGuiManager {
             |ui| match self.state {
                 ConfigState::MAIN => self.show_main_gui(ui, renderer),
                 ConfigState::CHANGE_PIC => todo!(),
-                ConfigState::CHANGE_NAME => todo!(),
+                ConfigState::CHANGE_TAG => self.show_change_tag(ui, renderer),
             });
     }
 
     fn on_update(&mut self, _server_coms: &mut ServerCommunication) -> Result<(), StdError> {
-        match self.state {
-            ConfigState::MAIN => (),
-            ConfigState::CHANGE_PIC => todo!(),
-            ConfigState::CHANGE_NAME => todo!(),
-        }
-                 
         Ok(())
     }
 }
@@ -109,64 +103,9 @@ impl ConfigOverlayGuiManager {
         );
     }
     
-    fn show_main_gui(&mut self, ui: &imgui::Ui, renderer: &Renderer) {
-        let shared_mut = self.app_state.shared_mut.borrow();
-        let user = if let Some(user) = &shared_mut.user { user } else { return; };
-
-        self.show_user_pic(ui, renderer);
-        ui.same_line();
-
-        let _table = ui.begin_table("##config_main_table", 2);
-
-        ui.table_setup_column("##config_main_menu");
-        ui.table_setup_column_with(imgui::TableColumnSetup { 
-            name: "##config_main_close_btn", 
-            flags: imgui::TableColumnFlags::WIDTH_FIXED, 
-            init_width_or_weight: 30.0,
-            ..Default::default()
-        });
-
-        ui.table_next_row();
-        ui.table_next_column();
-        
-        let mut _font = vec![use_font(ui, super::FontType::BOLD24)];
-        ui.text(user.tag());
-        spacing(ui, 7);
-
-        _font.push(use_font(ui, super::FontType::BOLD17));
-        button(
-            ui, 
-            "Change Tag", 
-            [200.0, 25.0], 
-            BORDER_RADIUS,
-            self.app_state.theme.accent_color, 
-            self.app_state.theme.sign_up_btn_color, 
-            self.app_state.theme.sign_up_btn_color, 
-        ); 
-        ui.spacing();
-        button(
-            ui, 
-            "Change Picture", 
-            [200.0, 25.0], 
-            BORDER_RADIUS,
-            self.app_state.theme.accent_color, 
-            self.app_state.theme.sign_up_btn_color, 
-            self.app_state.theme.sign_up_btn_color, 
-        );
-        ui.spacing();
-        button(
-            ui, 
-            "Change Theme", 
-            [200.0, 25.0], 
-            BORDER_RADIUS,
-            self.app_state.theme.accent_color, 
-            self.app_state.theme.sign_up_btn_color, 
-            self.app_state.theme.sign_up_btn_color, 
-        ); 
-
-        // Close button.
-        ui.table_next_column();
-        _font.push(use_font(ui, super::FontType::BOLD24));
+    fn show_close_button(&mut self, ui: &imgui::Ui) {
+        let _font = use_font(ui, super::FontType::BOLD24);
+        ui.set_cursor_pos([ui.content_region_max()[0] - 30.0, ui.cursor_pos()[1]]);
 
         if button(
             ui, 
@@ -181,6 +120,88 @@ impl ConfigOverlayGuiManager {
             self.timer_init = false;
             self.state = ConfigState::MAIN;
         }
+    }
+
+    fn show_main_gui(&mut self, ui: &imgui::Ui, renderer: &Renderer) {
+        let user_tag = if let Some(user) = &self.app_state.shared_mut.borrow().user { user.tag().to_string() } else { return; };
+
+        self.show_user_pic(ui, renderer);
+        ui.same_line();
+
+        let _table = ui.begin_table("##config_main_table", 1);
+        ui.table_setup_column_with(TableColumnSetup {
+            name: "main_menus",
+            flags: imgui::TableColumnFlags::WIDTH_FIXED,
+            init_width_or_weight: ui.content_region_avail()[0],
+            ..Default::default()
+        });
+        ui.table_next_row();
+        ui.table_next_column();
+        
+        let mut _font = vec![use_font(ui, super::FontType::BOLD24)];
+        ui.text(user_tag);
+        ui.same_line();
+        self.show_close_button(ui);
+        spacing(ui, 6);
+
+        _font.push(use_font(ui, super::FontType::BOLD17));
+        if button(
+            ui, 
+            "Change Tag", 
+            [200.0, 25.0], 
+            BORDER_RADIUS,
+            self.app_state.theme.accent_color, 
+            self.app_state.theme.sign_up_btn_color, 
+            self.app_state.theme.sign_up_btn_color, 
+        ) {
+            self.state = ConfigState::CHANGE_TAG;
+        }
+
+        ui.spacing();
+        button(
+            ui, 
+            "Change Picture", 
+            [200.0, 25.0], 
+            BORDER_RADIUS,
+            self.app_state.theme.accent_color, 
+            self.app_state.theme.sign_up_btn_color, 
+            self.app_state.theme.sign_up_btn_color, 
+        );
+
+        ui.spacing();
+        button(
+            ui, 
+            "Change Theme", 
+            [200.0, 25.0], 
+            BORDER_RADIUS,
+            self.app_state.theme.accent_color, 
+            self.app_state.theme.sign_up_btn_color, 
+            self.app_state.theme.sign_up_btn_color, 
+        ); 
+    }
+    
+    fn show_change_tag(&mut self, ui: &imgui::Ui, renderer: &Renderer) {
+        let _font = use_font(ui, super::FontType::BOLD24);
+        self.show_user_pic(ui, renderer);
+        let mut buffer = String::new();
+        
+        ui.same_line();
+        if text_input(
+            ui, 
+            "New Tag", 
+            &mut buffer, 
+            "##config_change_tag_input", 
+            [1.0, 1.0, 1.0, 1.0], 
+            [0.0, 0.0, 0.0, 1.0], 
+            BORDER_RADIUS, 
+            imgui::InputTextFlags::CALLBACK_RESIZE
+            | imgui::InputTextFlags::ENTER_RETURNS_TRUE,
+        ) {
+            info!("Change tag to: {buffer}");
+        }
+        
+        ui.same_line();
+        self.show_close_button(ui);
     }
 }
 
