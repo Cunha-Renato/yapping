@@ -137,6 +137,8 @@ where
         .flags(imgui::WindowFlags::NO_TITLE_BAR
             | imgui::WindowFlags::NO_MOVE
             | imgui::WindowFlags::NO_RESIZE
+            | imgui::WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS
+            | imgui::WindowFlags::NO_FOCUS_ON_APPEARING
             | flags.unwrap_or(imgui::WindowFlags::empty())
         )
         .build(|| func(&ui))
@@ -222,6 +224,7 @@ where
             | imgui::WindowFlags::NO_SCROLL_WITH_MOUSE
             | imgui::WindowFlags::NO_MOVE
             | imgui::WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS
+            | imgui::WindowFlags::NO_FOCUS_ON_APPEARING
             | flags.unwrap_or(imgui::WindowFlags::empty())
         )
         .build(|| func(&ui))

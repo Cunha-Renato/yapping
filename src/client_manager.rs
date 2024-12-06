@@ -146,6 +146,10 @@ impl ClientManager {
         if let Err(e) = self.gui_managers.sidebar.on_update(&mut self.server_coms.borrow_mut()) {
             error!("{e}");
         }
+        
+        if let Err(e) = self.gui_managers.config_overlay.on_update(&mut self.server_coms.borrow_mut()) {
+            error!("{e}");
+        }
     }
 
     pub(crate) fn on_responded_messages(&mut self, mut messages: Vec<(ServerMessage, Response)>) -> Result<(), StdError> {
@@ -227,6 +231,16 @@ impl ClientManager {
             return;
         }
 
+        {
+            let shared_mut = &mut self.app_state.shared_mut.borrow_mut();
+            if shared_mut.config {
+                self.gui_managers.config_overlay.show();
+                shared_mut.config = false;
+            }
+        }
+
+        self.gui_managers.config_overlay.on_imgui(ui, renderer);
+
         match &self.app_state.shared_mut.borrow().foreground_state {
             ForegroundState::MAIN_PAGE => {
                 self.gui_managers.sidebar.on_imgui(ui, renderer);
@@ -245,16 +259,6 @@ impl ClientManager {
                 self.gui_managers.find_user.on_imgui(ui, renderer);
             },
         }
-
-        {
-            let shared_mut = &mut self.app_state.shared_mut.borrow_mut();
-            if shared_mut.config {
-                self.gui_managers.config_overlay.show();
-                shared_mut.config = false;
-            }
-        }
-
-        self.gui_managers.config_overlay.on_imgui(ui, renderer);
     }
     
     pub(crate) fn show_debug_gui(&self, ui: &imgui::Ui) {
